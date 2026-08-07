@@ -1,0 +1,21 @@
+# Segredos
+.env
+.env.local
+.env*.local
+
+# Dados extraídos do sistema antigo.
+# NÃO versionar: contém CPF, CNPJ, endereço, telefone e e-mail de 1.825
+# clientes reais. Colocar isso num repositório, ainda que privado, é exposição
+# desnecessária de dado pessoal (LGPD). Os arquivos ficam só nesta máquina.
+db/migracao/legado/
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+
+# Sistema
+.DS_Store
+*.log

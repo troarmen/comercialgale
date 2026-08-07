@@ -9,13 +9,22 @@
 --   1.825 clientes · 556 produtos · 200 fabricantes
 --   6 categorias · 38 subcategorias · 120 tamanhos · 698 pedidos
 --
--- Regra de venda descoberta no painel antigo:
+-- Regra de venda descoberta no painel antigo (conferida contra pedidos reais):
 --   O produto é vendido em PACOTE FECHADO de N peças (1,2,3,4,5,6,10,12).
 --   O cliente escolhe o TAMANHO e quantos PACOTES quer.
---   Cada linha do pedido calcula:
---     valor_pacote = preco_unitario × pecas_por_pacote
---     total_linha  = valor_pacote × qtd_pacotes
---   Todo pedido é totalizado DUAS VEZES: em atacado e em varejo.
+--
+--   O PREÇO CADASTRADO É O DO PACOTE, não o da peça. O valor unitário que
+--   aparece para o cliente é derivado:
+--     preco_unitario = preco_pacote / pecas_por_pacote
+--     total_linha    = preco_pacote × qtd_pacotes
+--   Conferido: ref. 6000 → pacote R$ 25,95 ÷ 3 peças = R$ 8,65/peça, que é
+--   exatamente o unitário impresso no pedido 2026080001222.
+--
+--   Um tamanho pode ter preço próprio (54/56 e 58/60 custam mais). No legado
+--   isso é gravado como 0.00 quando herda do produto.
+--
+--   Todo pedido é totalizado DUAS VEZES: em atacado e em varejo. O varejo é
+--   preço sugerido de revenda, exibido para o lojista enxergar a margem.
 -- =============================================================================
 
 
@@ -213,9 +222,10 @@ create table public.produtos (
   descricao         text,
   tags              text[] not null default '{}',   -- legado: campo `tag` separado por vírgula
 
-  -- DOIS preços, ambos por PEÇA (não por pacote):
-  --   atacado = o que o lojista paga
-  --   varejo  = preço sugerido de revenda, exibido como referência de margem
+  -- DOIS preços, ambos referentes ao PACOTE FECHADO (não à peça avulsa):
+  --   atacado = o que o lojista paga pelo pacote
+  --   varejo  = revenda sugerida do pacote, exibida como referência de margem
+  -- O valor por peça é sempre derivado: preço ÷ embalagem.pecas
   preco_atacado     numeric(10,2) not null default 0 check (preco_atacado >= 0),
   preco_varejo      numeric(10,2) not null default 0 check (preco_varejo  >= 0),
 
@@ -227,6 +237,9 @@ create table public.produtos (
   lancamento        boolean not null default false,   -- legado: IS_LANCAMENTO
   ordem             integer not null default 0,
 
+  -- Documento de busca do catálogo, preenchido pelo gatilho da seção 9.
+  busca             tsvector,
+
   legado_id         bigint unique,
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
@@ -236,14 +249,15 @@ create index on public.produtos (categoria_id);
 create index on public.produtos (subcategoria_id);
 create index on public.produtos (fabricante_id);
 create index on public.produtos (ativo);
-create index produtos_busca_idx on public.produtos
-  using gin (to_tsvector('portuguese',
-    titulo || ' ' || modelo || ' ' || coalesce(array_to_string(tags, ' '), '')));
+create index produtos_busca_idx on public.produtos using gin (busca);
 
--- Variação = um tamanho disponível do produto, com preço próprio.
+-- Variação = um tamanho disponível do produto.
 -- No painel antigo esta é a tabela "Detalhes Selecionados" do cadastro:
--- colunas NCM | Tamanho | Preço Atacado | Preço Varejo.
--- Preço NULL = herda o preço do produto.
+-- colunas NCM | Tamanho | Preço Atacado | Preço Varejo — também por PACOTE.
+--
+-- Preço NULL = herda o preço do produto. O legado grava 0.00 nesse caso, o que
+-- é ambíguo (não dá para distinguir "herda" de "de graça"); a migração converte
+-- 0.00 em NULL. Na prática só tamanhos grandes (54/56, 58/60) têm valor próprio.
 create table public.produto_tamanhos (
   id              bigint primary key generated always as identity,
   produto_id      bigint not null references public.produtos (id) on delete cascade,
@@ -303,6 +317,11 @@ create table public.pedidos (
   observacoes_cliente text,
   observacoes_admin   text,
 
+  -- Marca os pedidos históricos cujo vínculo com o cadastro do cliente não pôde
+  -- ser determinado com certeza na migração (dois clientes de mesmo nome, ambos
+  -- pessoa física). São 26 dos 698. Alimenta uma tela de revisão no painel.
+  vinculo_revisar   boolean not null default false,
+
   -- Congela o cadastro do cliente na data do pedido. Se ele mudar de endereço
   -- depois, o pedido antigo continua mostrando para onde foi enviado.
   snapshot_cliente  jsonb not null default '{}'::jsonb,
@@ -333,15 +352,20 @@ create table public.pedido_itens (
   pecas_por_pacote  integer not null check (pecas_por_pacote > 0),
   qtd_pacotes       integer not null check (qtd_pacotes > 0),
 
-  preco_atacado     numeric(10,2) not null check (preco_atacado >= 0),  -- por peça
-  preco_varejo      numeric(10,2) not null check (preco_varejo  >= 0),  -- por peça
+  -- Preço do PACOTE, congelado no fechamento do pedido.
+  preco_pacote_atacado numeric(10,2) not null check (preco_pacote_atacado >= 0),
+  preco_pacote_varejo  numeric(10,2) not null check (preco_pacote_varejo  >= 0),
 
   -- Colunas calculadas: replicam a matemática do pedido antigo e impedem que
   -- um erro de arredondamento no front vire divergência no total.
+  preco_unitario_atacado numeric(12,4) generated always as
+    (preco_pacote_atacado / pecas_por_pacote) stored,
+  preco_unitario_varejo  numeric(12,4) generated always as
+    (preco_pacote_varejo  / pecas_por_pacote) stored,
   total_atacado numeric(12,2) generated always as
-    (preco_atacado * pecas_por_pacote * qtd_pacotes) stored,
+    (preco_pacote_atacado * qtd_pacotes) stored,
   total_varejo  numeric(12,2) generated always as
-    (preco_varejo  * pecas_por_pacote * qtd_pacotes) stored,
+    (preco_pacote_varejo  * qtd_pacotes) stored,
   total_pecas   integer generated always as
     (pecas_por_pacote * qtd_pacotes) stored
 );
@@ -456,15 +480,20 @@ create policy "catalogo publico" on public.produto_imagens  for select using (tr
 create policy "cliente ve seu perfil"   on public.profiles for select using (id = auth.uid());
 create policy "cliente ve seu cadastro" on public.clientes for select using (user_id = auth.uid());
 
-create policy "cliente ve seus pedidos" on public.pedidos
-  for select using (cliente_id = public.meu_cliente_id());
+-- PEDIDO É ASSUNTO EXCLUSIVO DO PAINEL.
+--
+-- O cliente PODE fechar um pedido, mas NUNCA consultá-lo depois — nem os
+-- próprios. Não existe "meus pedidos" no catálogo. A confirmação que ele
+-- recebe é o e-mail disparado no fechamento, e daí em diante o assunto corre
+-- pelo contato do Arthur.
+--
+-- Por isso abaixo há apenas política de INSERT. Sem política de SELECT, o RLS
+-- nega a leitura por padrão: mesmo que alguém chame a API direto com o token
+-- de um cliente logado, não volta uma linha sequer. A única leitura possível
+-- é pela política "admin total".
 create policy "cliente cria pedido" on public.pedidos
   for insert with check (cliente_id = public.meu_cliente_id());
 
-create policy "cliente ve seus itens" on public.pedido_itens
-  for select using (exists (
-    select 1 from public.pedidos p
-    where p.id = pedido_id and p.cliente_id = public.meu_cliente_id()));
 create policy "cliente cria itens" on public.pedido_itens
   for insert with check (exists (
     select 1 from public.pedidos p
@@ -472,29 +501,67 @@ create policy "cliente cria itens" on public.pedido_itens
 
 
 -- =============================================================================
--- 8. VIEW DE PREÇOS
+-- 8. PREÇO — TRAVA DE COLUNA
 --
--- Devolve zero linhas para visitante sem login ou cliente com preço suspenso.
--- Já resolve a herança de preço (tamanho sobrepõe produto) e o valor do pacote.
+-- O RLS do Postgres filtra LINHAS, não COLUNAS. Um visitante sem login recebe
+-- a linha do produto (o catálogo é público de propósito) e, sem a trava
+-- abaixo, bastaria pedir `?select=preco_atacado` na API para levar a tabela de
+-- preços inteira. Testado: vaza mesmo.
+--
+-- A proteção correta é privilégio de coluna. ATENÇÃO à ordem: no Postgres,
+-- quem tem SELECT no nível da TABELA lê todas as colunas, e um
+-- `REVOKE SELECT (coluna)` não surte efeito nenhum nesse caso. É preciso
+-- revogar o SELECT da tabela inteira e reconceder coluna a coluna.
+-- (Testado: com o REVOKE de coluna sozinho, o preço continuava saindo.)
+--
+-- Depois disso, a única porta para o preço é a view `precos_visiveis`, que
+-- roda como dona (SECURITY DEFINER) e checa `pode_ver_precos()` internamente.
+--
+-- O admin continua podendo ALTERAR preço: UPDATE é privilégio separado do
+-- SELECT e não foi revogado. Para exibir o valor atual na tela de edição, o
+-- painel lê pela mesma view — `pode_ver_precos()` já devolve true para admin.
+--
+-- Custo de manutenção: toda coluna nova em `produtos` precisa ser adicionada
+-- ao GRANT abaixo, ou fica invisível para o catálogo.
 -- =============================================================================
 
-create or replace view public.precos_visiveis
-with (security_invoker = on)
-as
+revoke select on public.produtos         from anon, authenticated;
+revoke select on public.produto_tamanhos from anon, authenticated;
+
+grant select (
+  id, categoria_id, subcategoria_id, fabricante_id, embalagem_id,
+  modelo, titulo, slug, descricao, tags,
+  ncm, possui_st, ativo, lancamento, ordem, busca,
+  legado_id, created_at, updated_at
+) on public.produtos to anon, authenticated;
+
+grant select (
+  id, produto_id, tamanho_id, ncm, ativo, ordem, legado_id
+) on public.produto_tamanhos to anon, authenticated;
+
+create or replace view public.precos_visiveis as
 select
   p.id                                        as produto_id,
   pt.id                                       as produto_tamanho_id,
   t.valor                                     as tamanho,
   e.pecas                                     as pecas_por_pacote,
-  coalesce(pt.preco_atacado, p.preco_atacado) as preco_atacado,
-  coalesce(pt.preco_varejo,  p.preco_varejo)  as preco_varejo,
-  coalesce(pt.preco_atacado, p.preco_atacado) * e.pecas as valor_pacote_atacado,
-  coalesce(pt.preco_varejo,  p.preco_varejo)  * e.pecas as valor_pacote_varejo
+  -- preço do pacote, já resolvida a herança tamanho → produto
+  coalesce(pt.preco_atacado, p.preco_atacado) as preco_pacote_atacado,
+  coalesce(pt.preco_varejo,  p.preco_varejo)  as preco_pacote_varejo,
+  -- valor por peça, como o cliente vê na tela do pedido
+  round(coalesce(pt.preco_atacado, p.preco_atacado) / e.pecas, 2) as preco_unitario_atacado,
+  round(coalesce(pt.preco_varejo,  p.preco_varejo)  / e.pecas, 2) as preco_unitario_varejo
 from public.produtos p
 join public.embalagens e       on e.id = p.embalagem_id
 left join public.produto_tamanhos pt on pt.produto_id = p.id and pt.ativo
 left join public.tamanhos t          on t.id = pt.tamanho_id
-where public.pode_ver_precos();
+-- Como a view roda como dona, ela ignora o RLS das tabelas de baixo. Por isso
+-- os dois filtros são explícitos aqui: quem pode ver preço, e quais produtos.
+-- O admin enxerga também os inativos, para conseguir editá-los.
+where public.pode_ver_precos()
+  and (p.ativo or public.is_admin());
+
+grant select on public.precos_visiveis to anon, authenticated;
 
 
 -- =============================================================================
@@ -512,6 +579,30 @@ create trigger t_categorias    before update on public.categorias    for each ro
 create trigger t_subcategorias before update on public.subcategorias for each row execute function public.touch_updated_at();
 create trigger t_produtos      before update on public.produtos      for each row execute function public.touch_updated_at();
 create trigger t_pedidos       before update on public.pedidos       for each row execute function public.touch_updated_at();
+
+-- Busca do catálogo.
+--
+-- Não dá para indexar a expressão diretamente: `array_to_string()` é STABLE,
+-- não IMMUTABLE, e o Postgres recusa índice funcional sobre função assim
+-- (erro 42P17). A solução padrão é materializar o tsvector numa coluna
+-- mantida por gatilho — que ainda sai mais rápido na consulta, porque o
+-- documento não precisa ser recalculado a cada busca.
+--
+-- Os pesos definem a relevância: título e referência valem mais que as tags,
+-- que valem mais que a descrição.
+create or replace function public.atualizar_busca_produto()
+returns trigger language plpgsql as $$
+begin
+  new.busca :=
+       setweight(to_tsvector('portuguese', coalesce(new.titulo, '')),  'A')
+    || setweight(to_tsvector('portuguese', coalesce(new.modelo, '')),  'A')
+    || setweight(to_tsvector('portuguese', coalesce(array_to_string(new.tags, ' '), '')), 'B')
+    || setweight(to_tsvector('portuguese', coalesce(new.descricao, '')), 'C');
+  return new;
+end $$;
+
+create trigger t_produtos_busca before insert or update on public.produtos
+  for each row execute function public.atualizar_busca_produto();
 
 -- Numeração no mesmo formato do sistema antigo: AAAAMM + sequencial de 7 dígitos.
 -- Mantém a continuidade visual para o Arthur e para os clientes antigos.
