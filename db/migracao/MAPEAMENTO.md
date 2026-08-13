@@ -51,18 +51,19 @@ Meias Infantis e Bebês (48) · Tangas Adultos (47) · Calças Adultos (44).
 
 ---
 
-## 4. Unidades → `embalagens`  (8 registros)
+## 4. Unidades → `kits`  (8 registros)
 
 O legado chama de "Unidade", mas **não é unidade de medida — é o tamanho do
-pacote fechado**: 1, 2, 3, 4, 5, 6, 10 e 12 peças.
+kit fechado**: 1, 2, 3, 4, 5, 6, 10 e 12 peças. O Arthur chama de "kit", e é
+esse o nome adotado no sistema novo.
 
 | Legado | Novo |
 |---|---|
 | `SIGLA` (número) | `pecas` |
 | `TITULO` ("6 unidades") | `descricao` |
 
-⚠️ O campo `unidade` do produto guarda o **ID da embalagem**, não a quantidade.
-Ex.: `unidade = 4` significa a embalagem de ID 4, que é o pacote de **3 peças**.
+⚠️ O campo `unidade` do produto guarda o **ID do kit**, não a quantidade.
+Ex.: `unidade = 4` aponta para o kit de ID 4, que tem **3 peças**.
 Confundir os dois erraria o preço de todo o catálogo.
 
 ---
@@ -98,9 +99,9 @@ forma clara.
 | `categoria` | `categoria_id` | |
 | `subcategoria` | `subcategoria_id` | ⚠️ ver armadilha abaixo |
 | `fabricante` | `fabricante_id` | |
-| `unidade` | `embalagem_id` | ver aviso da seção 4 |
-| `preco_atacado` | `preco_atacado` | ⚠️ **preço do PACOTE**, não da peça |
-| `preco` | `preco_varejo` | ⚠️ idem — revenda sugerida do pacote |
+| `unidade` | `kit_id` | ver aviso da seção 4 |
+| `preco_atacado` | `preco_atacado` | ⚠️ **preço do KIT**, não da peça |
+| `preco` | `preco_varejo` | ⚠️ idem — revenda sugerida do kit |
 | `ncm` | `ncm` | `"0"` vira nulo (nunca foi preenchido) |
 | `possui_st` | `possui_st` | |
 | `IS_LANCAMENTO` | `lancamento` | |
@@ -125,11 +126,11 @@ no mesmo lugar.
 ### Preço — a regra conferida contra pedidos reais
 
 ```
-preco_unitario = preco_pacote / pecas_por_pacote
-total_linha    = preco_pacote × qtd_pacotes
+preco_unitario = preco_kit / pecas_no_kit
+total_linha    = preco_kit × qtd_kits
 ```
 
-Verificação: ref. 6000, pacote de 3 peças, `preco_atacado = 25,95`.
+Verificação: ref. 6000, kit de 3 peças, `preco_atacado = 25,95`.
 No pedido 2026080001222 o unitário impresso é **8,65** — e 25,95 ÷ 3 = 8,65. ✅
 
 ### Tamanhos do produto → `produto_tamanhos`
@@ -225,10 +226,10 @@ Cada linha do pedido antigo tem 8 colunas; o pedido é impresso **duas vezes**
 | Descrição | `produto_titulo` |
 | Ref. | `produto_modelo` |
 | Tamanho | `tamanho` |
-| Unidade | `pecas_por_pacote` |
-| Qtd | `qtd_pacotes` |
-| Vl Pacote (atacado) | `preco_pacote_atacado` |
-| Vl Pacote (varejo) | `preco_pacote_varejo` |
+| Unidade | `pecas_no_kit` |
+| Qtd | `qtd_kits` |
+| Vl Kit (atacado) | `preco_kit_atacado` |
+| Vl Kit (varejo) | `preco_kit_varejo` |
 
 ### Conferência dos 698 pedidos extraídos
 
@@ -239,8 +240,8 @@ Cada linha do pedido antigo tem 8 colunas; o pedido é impresso **duas vezes**
 | Linhas com conta divergente | **0** |
 | Pedidos cuja soma dos itens ≠ total | **0** |
 
-A matemática do pacote fecha em **todas as 18.475 linhas**, o que confirma em
-definitivo a regra `total = preco_pacote × qtd_pacotes`.
+A matemática do kit fecha em **todas as 18.475 linhas**, o que confirma em
+definitivo a regra `total = preco_kit × qtd_kits`.
 
 Status no legado: 364 pagos · 315 aguardando pagamento · 11 cancelados ·
 ⚠️ 8 com status `0` ("desativado"), que não aparece na lista de status de

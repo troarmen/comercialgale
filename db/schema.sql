@@ -10,14 +10,14 @@
 --   6 categorias · 38 subcategorias · 120 tamanhos · 698 pedidos
 --
 -- Regra de venda descoberta no painel antigo (conferida contra pedidos reais):
---   O produto é vendido em PACOTE FECHADO de N peças (1,2,3,4,5,6,10,12).
---   O cliente escolhe o TAMANHO e quantos PACOTES quer.
+--   O produto é vendido em KIT FECHADO de N peças (1,2,3,4,5,6,10,12).
+--   O cliente escolhe o TAMANHO e quantos KITS quer.
 --
---   O PREÇO CADASTRADO É O DO PACOTE, não o da peça. O valor unitário que
+--   O PREÇO CADASTRADO É O DO KIT, não o da peça. O valor unitário que
 --   aparece para o cliente é derivado:
---     preco_unitario = preco_pacote / pecas_por_pacote
---     total_linha    = preco_pacote × qtd_pacotes
---   Conferido: ref. 6000 → pacote R$ 25,95 ÷ 3 peças = R$ 8,65/peça, que é
+--     preco_unitario = preco_kit / pecas_no_kit
+--     total_linha    = preco_kit × qtd_kits
+--   Conferido: ref. 6000 → kit R$ 25,95 ÷ 3 peças = R$ 8,65/peça, que é
 --   exatamente o unitário impresso no pedido 2026080001222.
 --
 --   Um tamanho pode ter preço próprio (54/56 e 58/60 custam mais). No legado
@@ -109,14 +109,22 @@ create table public.clientes (
 
   legado_id         bigint,             -- ID do cliente no sistema PHP antigo
 
+  -- Quando o cliente se cadastrou de verdade, trazido do sistema antigo.
+  -- Diferente de created_at, que marca a entrada da linha NESTE banco: na
+  -- migração os 1.825 clientes entraram todos no mesmo dia, então só esta
+  -- coluna responde "quantos clientes novos tivemos no mês".
+  cadastrado_em     date default current_date,
+
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
 
 create index on public.clientes (status);
 create index on public.clientes (nome);
-create unique index clientes_legado_id_uniq on public.clientes (legado_id)
-  where legado_id is not null;
+-- Constraint normal, não índice parcial: ON CONFLICT (usado pela importação)
+-- não aceita índice com WHERE. UNIQUE aceita vários NULL, então cliente
+-- cadastrado pelo painel, sem legado_id, continua livre.
+alter table public.clientes add constraint clientes_legado_id_key unique (legado_id);
 -- Não usei UNIQUE em documento: no legado há 1.825 cadastros com duplicidade
 -- provável. A checagem de duplicados vira uma tela de "revisar cadastros".
 create index on public.clientes (documento);
@@ -192,8 +200,9 @@ create table public.tamanhos (
   legado_id   bigint unique
 );
 
--- Tamanho do pacote fechado. Legado: 1,2,3,4,5,6,10,12 unidades.
-create table public.embalagens (
+-- Tamanho do kit fechado. Legado: 1,2,3,4,5,6,10,12 unidades.
+-- "Kit" é a palavra que o Arthur usa; o legado dizia "Unidade".
+create table public.kits (
   id            bigint primary key generated always as identity,
   pecas         integer not null unique check (pecas > 0),
   descricao     text not null,          -- "6 unidades"
@@ -214,7 +223,7 @@ create table public.produtos (
   -- subcategoria é opcional: no legado há produtos soltos direto na categoria.
   subcategoria_id   bigint references public.subcategorias (id) on delete restrict,
   fabricante_id     bigint references public.fabricantes (id) on delete restrict,
-  embalagem_id      bigint not null references public.embalagens (id) on delete restrict,
+  kit_id      bigint not null references public.kits (id) on delete restrict,
 
   modelo            text not null,      -- referência da peça. Ex: "MF 307 A"
   titulo            text not null,
@@ -222,10 +231,10 @@ create table public.produtos (
   descricao         text,
   tags              text[] not null default '{}',   -- legado: campo `tag` separado por vírgula
 
-  -- DOIS preços, ambos referentes ao PACOTE FECHADO (não à peça avulsa):
-  --   atacado = o que o lojista paga pelo pacote
-  --   varejo  = revenda sugerida do pacote, exibida como referência de margem
-  -- O valor por peça é sempre derivado: preço ÷ embalagem.pecas
+  -- DOIS preços, ambos referentes ao KIT FECHADO (não à peça avulsa):
+  --   atacado = o que o lojista paga pelo kit
+  --   varejo  = revenda sugerida do kit, exibida como referência de margem
+  -- O valor por peça é sempre derivado: preço ÷ kits.pecas
   preco_atacado     numeric(10,2) not null default 0 check (preco_atacado >= 0),
   preco_varejo      numeric(10,2) not null default 0 check (preco_varejo  >= 0),
 
@@ -253,7 +262,7 @@ create index produtos_busca_idx on public.produtos using gin (busca);
 
 -- Variação = um tamanho disponível do produto.
 -- No painel antigo esta é a tabela "Detalhes Selecionados" do cadastro:
--- colunas NCM | Tamanho | Preço Atacado | Preço Varejo — também por PACOTE.
+-- colunas NCM | Tamanho | Preço Atacado | Preço Varejo — também por KIT.
 --
 -- Preço NULL = herda o preço do produto. O legado grava 0.00 nesse caso, o que
 -- é ambíguo (não dá para distinguir "herda" de "de graça"); a migração converte
@@ -349,25 +358,25 @@ create table public.pedido_itens (
   produto_modelo    text not null,      -- "Ref." no pedido antigo
   tamanho           text,
 
-  pecas_por_pacote  integer not null check (pecas_por_pacote > 0),
-  qtd_pacotes       integer not null check (qtd_pacotes > 0),
+  pecas_no_kit  integer not null check (pecas_no_kit > 0),
+  qtd_kits          integer not null check (qtd_kits > 0),
 
-  -- Preço do PACOTE, congelado no fechamento do pedido.
-  preco_pacote_atacado numeric(10,2) not null check (preco_pacote_atacado >= 0),
-  preco_pacote_varejo  numeric(10,2) not null check (preco_pacote_varejo  >= 0),
+  -- Preço do KIT, congelado no fechamento do pedido.
+  preco_kit_atacado numeric(10,2) not null check (preco_kit_atacado >= 0),
+  preco_kit_varejo  numeric(10,2) not null check (preco_kit_varejo  >= 0),
 
   -- Colunas calculadas: replicam a matemática do pedido antigo e impedem que
   -- um erro de arredondamento no front vire divergência no total.
   preco_unitario_atacado numeric(12,4) generated always as
-    (preco_pacote_atacado / pecas_por_pacote) stored,
+    (preco_kit_atacado / pecas_no_kit) stored,
   preco_unitario_varejo  numeric(12,4) generated always as
-    (preco_pacote_varejo  / pecas_por_pacote) stored,
+    (preco_kit_varejo  / pecas_no_kit) stored,
   total_atacado numeric(12,2) generated always as
-    (preco_pacote_atacado * qtd_pacotes) stored,
+    (preco_kit_atacado * qtd_kits) stored,
   total_varejo  numeric(12,2) generated always as
-    (preco_pacote_varejo  * qtd_pacotes) stored,
+    (preco_kit_varejo  * qtd_kits) stored,
   total_pecas   integer generated always as
-    (pecas_por_pacote * qtd_pacotes) stored
+    (pecas_no_kit * qtd_kits) stored
 );
 
 create index on public.pedido_itens (pedido_id);
@@ -416,7 +425,7 @@ alter table public.fabricantes      enable row level security;
 alter table public.categorias       enable row level security;
 alter table public.subcategorias    enable row level security;
 alter table public.tamanhos         enable row level security;
-alter table public.embalagens       enable row level security;
+alter table public.kits       enable row level security;
 alter table public.produtos         enable row level security;
 alter table public.produto_tamanhos enable row level security;
 alter table public.produto_imagens  enable row level security;
@@ -455,7 +464,7 @@ create policy "admin total" on public.fabricantes      for all using (public.is_
 create policy "admin total" on public.categorias       for all using (public.is_admin()) with check (public.is_admin());
 create policy "admin total" on public.subcategorias    for all using (public.is_admin()) with check (public.is_admin());
 create policy "admin total" on public.tamanhos         for all using (public.is_admin()) with check (public.is_admin());
-create policy "admin total" on public.embalagens       for all using (public.is_admin()) with check (public.is_admin());
+create policy "admin total" on public.kits       for all using (public.is_admin()) with check (public.is_admin());
 create policy "admin total" on public.produtos         for all using (public.is_admin()) with check (public.is_admin());
 create policy "admin total" on public.produto_tamanhos for all using (public.is_admin()) with check (public.is_admin());
 create policy "admin total" on public.produto_imagens  for all using (public.is_admin()) with check (public.is_admin());
@@ -471,12 +480,19 @@ create policy "catalogo publico" on public.fabricantes      for select using (at
 create policy "catalogo publico" on public.categorias       for select using (ativo);
 create policy "catalogo publico" on public.subcategorias    for select using (ativo);
 create policy "catalogo publico" on public.tamanhos         for select using (ativo);
-create policy "catalogo publico" on public.embalagens       for select using (ativo);
+create policy "catalogo publico" on public.kits       for select using (ativo);
 create policy "catalogo publico" on public.produtos         for select using (ativo);
 create policy "catalogo publico" on public.produto_tamanhos for select using (ativo);
 create policy "catalogo publico" on public.produto_imagens  for select using (true);
 
 -- --- Cliente logado ----------------------------------------------------------
+-- Três chaves de configuração são públicas: o catálogo precisa do pedido
+-- mínimo, do aviso do topo e da decisão sobre o preço de revenda.
+-- `emails_notificacao` continua restrito ao painel.
+create policy "config publica" on public.configuracoes
+  for select using (chave in (
+    'pedido_minimo_valor', 'catalogo_aviso', 'exibir_preco_varejo'));
+
 create policy "cliente ve seu perfil"   on public.profiles for select using (id = auth.uid());
 create policy "cliente ve seu cadastro" on public.clientes for select using (user_id = auth.uid());
 
@@ -529,7 +545,7 @@ revoke select on public.produtos         from anon, authenticated;
 revoke select on public.produto_tamanhos from anon, authenticated;
 
 grant select (
-  id, categoria_id, subcategoria_id, fabricante_id, embalagem_id,
+  id, categoria_id, subcategoria_id, fabricante_id, kit_id,
   modelo, titulo, slug, descricao, tags,
   ncm, possui_st, ativo, lancamento, ordem, busca,
   legado_id, created_at, updated_at
@@ -544,15 +560,23 @@ select
   p.id                                        as produto_id,
   pt.id                                       as produto_tamanho_id,
   t.valor                                     as tamanho,
-  e.pecas                                     as pecas_por_pacote,
-  -- preço do pacote, já resolvida a herança tamanho → produto
-  coalesce(pt.preco_atacado, p.preco_atacado) as preco_pacote_atacado,
-  coalesce(pt.preco_varejo,  p.preco_varejo)  as preco_pacote_varejo,
+  e.pecas                                     as pecas_no_kit,
+  -- preço do kit, já resolvida a herança tamanho → produto
+  coalesce(pt.preco_atacado, p.preco_atacado) as preco_kit_atacado,
+  coalesce(pt.preco_varejo,  p.preco_varejo)  as preco_kit_varejo,
+  -- preço do produto, ignorando o tamanho
+  p.preco_atacado                             as preco_base_atacado,
+  p.preco_varejo                              as preco_base_varejo,
+  -- preço específico do tamanho; NULL quando herda do produto.
+  -- O cadastro precisa desta distinção: sem ela, salvar o formulário
+  -- transformaria preço herdado em fixo ou apagaria o preço próprio.
+  pt.preco_atacado                            as preco_proprio_atacado,
+  pt.preco_varejo                             as preco_proprio_varejo,
   -- valor por peça, como o cliente vê na tela do pedido
   round(coalesce(pt.preco_atacado, p.preco_atacado) / e.pecas, 2) as preco_unitario_atacado,
   round(coalesce(pt.preco_varejo,  p.preco_varejo)  / e.pecas, 2) as preco_unitario_varejo
 from public.produtos p
-join public.embalagens e       on e.id = p.embalagem_id
+join public.kits e       on e.id = p.kit_id
 left join public.produto_tamanhos pt on pt.produto_id = p.id and pt.ativo
 left join public.tamanhos t          on t.id = pt.tamanho_id
 -- Como a view roda como dona, ela ignora o RLS das tabelas de baixo. Por isso

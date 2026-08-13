@@ -11,7 +11,7 @@ Uso:
 
 Saída em db/migracao/legado/:
     fabricantes.json  categorias.json  subcategorias.json
-    tamanhos.json     embalagens.json  caracteristicas.json
+    tamanhos.json     kits.json  caracteristicas.json
     produtos.jsonl    clientes.jsonl   pedidos.jsonl
     imagens/          (fotos originais)
     relatorio.json    (contagens e falhas)
@@ -230,7 +230,7 @@ def extrair_apoio(p):
             "ordem": int(r.get("ORDEM") or 0),
             "ativo": r.get("DT_RowStatus") == "1",
         })
-    grava_json("embalagens.json", emb)
+    grava_json("kits.json", emb)
 
     # tamanhos: a lista completa só existe dentro do <select> do cadastro de produto
     ids = [r["ID"] for r in p.grid("/controller/produto/grid")]
@@ -267,8 +267,8 @@ def variacoes_do_html(html):
             "tamanho": sel.group(2).strip() if sel else None,
             "ncm": (ncm.group(1) if ncm else "") or None,
             # 0.00 no legado significa "herda do produto", não "de graça"
-            "preco_pacote_atacado": pa_v if pa_v else None,
-            "preco_pacote_varejo": pv_v if pv_v else None,
+            "preco_kit_atacado": pa_v if pa_v else None,
+            "preco_kit_varejo": pv_v if pv_v else None,
         })
     return saida
 
@@ -309,10 +309,10 @@ def extrair_produtos(p, ids):
                 "categoria_legado_id": int(c["categoria"]) if c.get("categoria") else None,
                 "subcategoria_legado_id": subcat,
                 "fabricante_legado_id": int(c["fabricante"]) if c.get("fabricante") else None,
-                "embalagem_legado_id": int(c["unidade"]) if c.get("unidade") else None,
-                # preços do PACOTE fechado
-                "preco_pacote_atacado": dinheiro(c.get("preco_atacado")),
-                "preco_pacote_varejo": dinheiro(c.get("preco")),
+                "kit_legado_id": int(c["unidade"]) if c.get("unidade") else None,
+                # preços do KIT fechado
+                "preco_kit_atacado": dinheiro(c.get("preco_atacado")),
+                "preco_kit_varejo": dinheiro(c.get("preco")),
                 # o legado grava "0" quando o NCM nunca foi preenchido
                 "ncm": ((c.get("ncm") or "").strip() or None) if (c.get("ncm") or "").strip() != "0" else None,
                 "possui_st": c.get("possui_st") == "1",
@@ -397,7 +397,7 @@ def itens_do_pedido(html):
     """
     O pedido traz DUAS tabelas com as mesmas linhas: primeiro atacado, depois
     varejo. Cada <tr class="produto"> tem 8 colunas:
-      Descrição | Ref. | Tamanho | Unidade | Vl Unitário | Qtd | Vl Pacote | Total
+      Descrição | Ref. | Tamanho | Kit | Vl Unitário | Qtd | Vl Kit | Total
     """
     blocos = re.findall(r'<tr class="produto">(.*?)</tr>', html, re.S)
     linhas = []
@@ -416,10 +416,10 @@ def itens_do_pedido(html):
             "produto_titulo": a[0],
             "produto_modelo": a[1],
             "tamanho": a[2] or None,
-            "pecas_por_pacote": int(a[3] or 1),
-            "qtd_pacotes": int(a[5] or 1),
-            "preco_pacote_atacado": dinheiro(a[6]),
-            "preco_pacote_varejo": dinheiro(v[6]) if v[6] else None,
+            "pecas_no_kit": int(a[3] or 1),
+            "qtd_kits": int(a[5] or 1),
+            "preco_kit_atacado": dinheiro(a[6]),
+            "preco_kit_varejo": dinheiro(v[6]) if v[6] else None,
             "total_atacado": dinheiro(a[7]),
             "total_varejo": dinheiro(v[7]) if v[7] else None,
         })

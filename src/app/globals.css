@@ -1,0 +1,205 @@
+@import "tailwindcss";
+
+/**
+ * Paleta da Galé, extraída do logo da loja (galelingerie.com.br):
+ * o coração vermelho e o carvão da tipografia.
+ *
+ * O vermelho é forte e cansa se usado em área grande — por isso fica só em
+ * ação primária, alerta e destaque. A estrutura do painel é carvão e neutros.
+ */
+@theme {
+  --color-gale-50: #fef2f3;
+  --color-gale-100: #fde3e5;
+  --color-gale-200: #fbccd1;
+  --color-gale-300: #f7a5ad;
+  --color-gale-400: #f27484;
+  --color-gale-500: #e63946;
+  --color-gale-600: #d12437;
+  --color-gale-700: #b01a2c;
+  --color-gale-800: #93192a;
+  --color-gale-900: #7d1927;
+
+  --color-carvao-50: #f6f6f6;
+  --color-carvao-100: #e7e7e7;
+  --color-carvao-200: #d1d1d1;
+  --color-carvao-300: #b0b0b0;
+  --color-carvao-400: #888888;
+  --color-carvao-500: #6d6d6d;
+  --color-carvao-600: #5d5d5d;
+  --color-carvao-700: #4f4f4f;
+  --color-carvao-800: #3a3a3a;
+  --color-carvao-900: #2b2b2b;
+  --color-carvao-950: #1f1f1f;
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+}
+
+/**
+ * TOKENS SEMÂNTICOS — a única coisa que as telas usam.
+ *
+ * Nenhum componente escreve cor fixa: escreve `bg-superficie`, `text-suave`,
+ * `border-borda`. Trocar de tema é trocar os valores aqui embaixo, e qualquer
+ * tela nova já nasce funcionando nos dois modos.
+ *
+ * `inline` faz o Tailwind apontar direto para a variável em vez de copiar o
+ * valor no build — sem isso, a troca de tema em tempo de execução não pega.
+ */
+@theme inline {
+  --color-fundo: var(--fundo);
+  --color-superficie: var(--superficie);
+  --color-superficie-2: var(--superficie-2);
+  --color-borda: var(--borda);
+  --color-borda-forte: var(--borda-forte);
+  --color-texto: var(--texto);
+  --color-suave: var(--suave);
+  --color-tenue: var(--tenue);
+
+  --color-menu: var(--menu);
+  --color-menu-item: var(--menu-item);
+  --color-menu-ativo: var(--menu-ativo);
+  --color-menu-texto: var(--menu-texto);
+  --color-menu-borda: var(--menu-borda);
+
+  /*
+   * Acento vermelho separado em dois usos, por causa de contraste:
+   *   --acento       fundo de botão e etiqueta, sempre com texto branco
+   *   --acento-texto vermelho usado COMO texto, sobre fundo claro ou escuro
+   *
+   * O gale-500 da marca só atinge 4,17:1 com branco por cima e 4,00:1 como
+   * texto no tema escuro — abaixo do mínimo de 4,5:1 para texto normal.
+   * Por isso o botão usa gale-600 e o texto troca de tom conforme o tema.
+   * O gale-500 puro continua em ícone e traço, onde o mínimo é 3:1.
+   */
+  --color-acento: var(--acento);
+  --color-acento-forte: var(--acento-forte);
+  --color-acento-texto: var(--acento-texto);
+
+  /* Estados: verde para ativo/pago, âmbar para pendente. Mesma lógica do
+     acento — o tom precisa mudar entre os temas para continuar legível. */
+  --color-ok-texto: var(--ok-texto);
+  --color-ok-fundo: var(--ok-fundo);
+  --color-alerta-texto: var(--alerta-texto);
+  --color-alerta-fundo: var(--alerta-fundo);
+}
+
+/* ---------------------------------------------------------------- tema claro */
+:root {
+  color-scheme: light;
+
+  --fundo: #f6f6f6;
+  --superficie: #ffffff;
+  --superficie-2: #fafafa;
+  --borda: #e7e7e7;
+  --borda-forte: #d1d1d1;
+  --texto: #2b2b2b;
+  --suave: #6d6d6d;
+  --tenue: #888888;
+
+  --menu: #1f1f1f;
+  --menu-item: #2b2b2b;
+  --menu-ativo: #3a3a3a;
+  --menu-texto: #b0b0b0;
+  --menu-borda: #3a3a3a;
+
+  --acento: #d12437;        /* branco por cima: 5,23:1 */
+  --acento-forte: #b01a2c;
+  --acento-texto: #d12437;  /* sobre cartão branco: 5,23:1 */
+
+  --ok-texto: #047857;
+  --ok-fundo: #04785714;
+  --alerta-texto: #b45309;
+  --alerta-fundo: #b4530914;
+}
+
+/* --------------------------------------------------------------- tema escuro */
+/**
+ * Definido uma vez só, aplicado em dois gatilhos:
+ *   1. escolha explícita do usuário  -> [data-tema="escuro"]
+ *   2. preferência do sistema, quando não houve escolha
+ *
+ * O `:not([data-tema="claro"])` garante que quem escolheu claro à mão continue
+ * no claro mesmo com o sistema no escuro.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    color-scheme: dark;
+
+    --fundo: #141414;
+    --superficie: #1e1e1e;
+    --superficie-2: #262626;
+    --borda: #2f2f2f;
+    --borda-forte: #3d3d3d;
+    --texto: #ededed;
+    --suave: #a3a3a3;
+    --tenue: #7a7a7a;
+
+    --menu: #0f0f0f;
+    --menu-item: #1a1a1a;
+    --menu-ativo: #262626;
+    --menu-texto: #9a9a9a;
+    --menu-borda: #2a2a2a;
+
+    --acento: #d12437;
+    --acento-forte: #b01a2c;
+    --acento-texto: #f27484;  /* sobre cartão #1e1e1e: 6,04:1 */
+
+    --ok-texto: #34d399;
+    --ok-fundo: #34d3991f;
+    --alerta-texto: #fbbf24;
+    --alerta-fundo: #fbbf241f;
+  }
+}
+
+:root[data-tema="escuro"] {
+  color-scheme: dark;
+
+  --fundo: #141414;
+  --superficie: #1e1e1e;
+  --superficie-2: #262626;
+  --borda: #2f2f2f;
+  --borda-forte: #3d3d3d;
+  --texto: #ededed;
+  --suave: #a3a3a3;
+  --tenue: #7a7a7a;
+
+  --menu: #0f0f0f;
+  --menu-item: #1a1a1a;
+  --menu-ativo: #262626;
+  --menu-texto: #9a9a9a;
+  --menu-borda: #2a2a2a;
+
+  --acento: #d12437;
+  --acento-forte: #b01a2c;
+  --acento-texto: #f27484;  /* sobre cartão #1e1e1e: 6,04:1 */
+
+  --ok-texto: #34d399;
+  --ok-fundo: #34d3991f;
+  --alerta-texto: #fbbf24;
+  --alerta-fundo: #fbbf241f;
+}
+
+body {
+  background: var(--fundo);
+  color: var(--texto);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-gale-500);
+  outline-offset: 2px;
+}
+
+.rolagem-fina {
+  scrollbar-width: thin;
+  scrollbar-color: var(--menu-ativo) transparent;
+}
+
+/* Respeita quem pediu menos animação no sistema operacional */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

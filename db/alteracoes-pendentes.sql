@@ -1,0 +1,8 @@
+-- =============================================================================
+-- ALTERAÇÕES DE BANCO AINDA NÃO APLICADAS
+--
+-- Vazio no momento. Quando surgir uma mudança definida mas ainda não rodada,
+-- ela fica aqui; depois de aplicada, migra para `db/schema.sql` e sai daqui.
+--
+-- Histórico do que já foi aplicado: ver `db/migracoes/`.
+-- =============================================================================

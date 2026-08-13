@@ -2,7 +2,7 @@
 """
 Importa o catálogo extraído do sistema antigo para o Supabase.
 
-Escopo: fabricantes, categorias, subcategorias, tamanhos, embalagens,
+Escopo: fabricantes, categorias, subcategorias, tamanhos, kits,
 produtos, variações de tamanho e imagens.
 NÃO importa clientes nem pedidos — ficam para uma segunda etapa.
 
@@ -25,6 +25,10 @@ from collections import Counter
 
 import requests
 from PIL import Image
+
+# Uma única definição da regra de limpeza, compartilhada com o script que
+# corrigiu as descrições já importadas.
+from limpar_descricoes import limpar as limpar_descricao
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LEGADO = os.path.join(RAIZ, "db", "migracao", "legado")
@@ -140,10 +144,10 @@ def importar_apoio():
         })
     m_sub = mapa(upsert("subcategorias", subs))
 
-    emb = upsert("embalagens", [{
+    kits = upsert("kits", [{
         "legado_id": e["legado_id"], "pecas": e["pecas"],
         "descricao": e["descricao"], "ordem": e["ordem"], "ativo": e["ativo"],
-    } for e in J("embalagens.json")])
+    } for e in J("kits.json")])
 
     # tipo vem da classificação revisável em db/migracao/tamanhos.csv
     tipos = {}
@@ -163,7 +167,7 @@ def importar_apoio():
     } for t in J("tamanhos.json")])
 
     return {"cat": m_cat, "sub": m_sub, "fab": mapa(fab),
-            "emb": mapa(emb), "tam": mapa(tam)}
+            "kit": mapa(kits), "tam": mapa(tam)}
 
 
 # ---------------------------------------------------------------------- produtos
@@ -188,11 +192,14 @@ def importar_produtos(m):
         "categoria_id": m["cat"][p["categoria_legado_id"]],
         "subcategoria_id": m["sub"].get(p["subcategoria_legado_id"]),
         "fabricante_id": m["fab"].get(p["fabricante_legado_id"]),
-        "embalagem_id": m["emb"][p["embalagem_legado_id"]],
+        "kit_id": m["kit"][p["kit_legado_id"]],
         "modelo": p["modelo"], "titulo": p["titulo"], "slug": p["slug_final"],
-        "descricao": p.get("descricao"), "tags": p.get("tags") or [],
-        "preco_atacado": p["preco_pacote_atacado"] or 0,
-        "preco_varejo": p["preco_pacote_varejo"] or 0,
+        # O legado guarda a descrição como HTML e ela chega com `&nbsp;` cru;
+        # a mesma regra usada em limpar_descricoes.py deixa o texto legível.
+        "descricao": limpar_descricao(p.get("descricao")),
+        "tags": p.get("tags") or [],
+        "preco_atacado": p["preco_kit_atacado"] or 0,
+        "preco_varejo": p["preco_kit_varejo"] or 0,
         "ncm": p.get("ncm"), "possui_st": p["possui_st"],
         "ativo": p["ativo"], "lancamento": p["lancamento"],
     } for p in prods]
@@ -204,8 +211,8 @@ def importar_produtos(m):
         "produto_id": m_prod[p["legado_id"]],
         "tamanho_id": m["tam"][t["tamanho_legado_id"]],
         # 0.00 no legado significa "herda do produto"; aqui vira NULL explícito
-        "preco_atacado": t["preco_pacote_atacado"],
-        "preco_varejo": t["preco_pacote_varejo"],
+        "preco_atacado": t["preco_kit_atacado"],
+        "preco_varejo": t["preco_kit_varejo"],
         "ncm": t.get("ncm"), "ativo": True,
     } for p in prods for t in p["tamanhos"]]
     upsert("produto_tamanhos", variacoes)

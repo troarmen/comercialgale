@@ -19,3 +19,12 @@ dist/
 # Sistema
 .DS_Store
 *.log
+
+# Next.js
+/.next/
+/out/
+next-env.d.ts
+
+# Python
+__pycache__/
+*.pyc
