@@ -9,7 +9,67 @@ import { NextResponse, type NextRequest } from "next/server";
  * o banco — e, na última instância, o próprio RLS. Este arquivo (proxy) não deve
  * consultar tabela: roda em toda requisição e ficaria caro.
  */
+/**
+ * Endereços do site antigo usavam IDs numéricos:
+ *   /produto/1860/slug · /produtos/47/lingerie · /produtos/47/11/tangas adultos
+ *
+ * O redirecionamento precisa acontecer AQUI para sair como 301 de verdade —
+ * dentro da página, o streaming já mandou status 200 antes do redirect.
+ * A consulta só roda quando a URL casa com o padrão legado (hoje, tráfego
+ * residual de busca), então a regra "proxy não consulta banco" segue valendo
+ * para a navegação normal.
+ */
+async function redirecionarLegado(request: NextRequest) {
+  const caminho = request.nextUrl.pathname;
+
+  const buscarSlug = async (tabela: string, legadoId: string) => {
+    const url =
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${tabela}` +
+      `?legado_id=eq.${legadoId}&select=slug${tabela === "subcategorias" ? ",categorias(slug)" : ""}`;
+    const r = await fetch(url, {
+      headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! },
+    });
+    if (!r.ok) return null;
+    const [linha] = await r.json();
+    return linha ?? null;
+  };
+
+  let destino: string | null = null;
+
+  const produto = caminho.match(/^\/produto\/(\d+)(?:\/|$)/);
+  if (produto) {
+    const linha = await buscarSlug("produtos", produto[1]);
+    destino = linha ? `/produto/${linha.slug}` : null;
+  }
+
+  const subcategoria = caminho.match(/^\/produtos\/\d+\/(\d+)(?:\/|$)/);
+  const categoria = caminho.match(/^\/produtos\/(\d+)(?:\/|$)/);
+  if (subcategoria) {
+    const linha = await buscarSlug("subcategorias", subcategoria[1]);
+    destino = linha?.categorias
+      ? `/produtos/${linha.categorias.slug}/${linha.slug}`
+      : null;
+  } else if (categoria) {
+    const linha = await buscarSlug("categorias", categoria[1]);
+    destino = linha ? `/produtos/${linha.slug}` : null;
+  }
+
+  if (destino) {
+    const url = request.nextUrl.clone();
+    url.pathname = destino;
+    url.search = "";
+    return NextResponse.redirect(url, 301);
+  }
+  return null;
+}
+
 export async function proxy(request: NextRequest) {
+  const caminho0 = request.nextUrl.pathname;
+  if (/^\/produtos?\/\d+(\/|$)/.test(caminho0)) {
+    const redirecionamento = await redirecionarLegado(request);
+    if (redirecionamento) return redirecionamento;
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

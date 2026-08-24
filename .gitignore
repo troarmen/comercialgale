@@ -28,3 +28,9 @@ next-env.d.ts
 # Python
 __pycache__/
 *.pyc
+
+# Supabase local (CLI)
+supabase/.temp/
+
+# Ferramentas locais do agente
+.claude/
