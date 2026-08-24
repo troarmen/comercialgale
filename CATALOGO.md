@@ -123,6 +123,15 @@ Clientes, onde o Arthur aprova e cria o login — fluxo que o painel já tem.
   desliza ao abrir, chips/pills ganham sombra, linha tracejada liga os passos
   do "como funciona".
 
+- **Enquadramento das fotos** (24/08): medidas as 556 fotos do legado, 87% são
+  QUADRADAS (mediana 1:1; extremos 0,52 e 2,45). As molduras 3:4 com
+  `object-cover` cortavam ~25% de quase toda foto. Regra agora, em todo lugar
+  onde produto aparece (cartão, galeria e miniaturas, hero, categoria,
+  carrinho): moldura `aspect-square` branca + `object-contain` com margem
+  interna (`p-2`…`p-4`). Foto nunca é cortada, em nenhuma largura; a que não é
+  quadrada ganha faixas brancas que somem no fundo branco do estúdio. O zoom
+  do hover caiu para 1,02 para não encostar na borda.
+
 ### Demais decisões
 
 - **Grade de compra B2B**: na ficha, cada tamanho tem contador de kits e um
@@ -132,7 +141,7 @@ Clientes, onde o Arthur aprova e cria o login — fluxo que o painel já tem.
 - Carrinho local (localStorage + `useSyncExternalStore`, mesmo desenho do
   tema). A chave do item é `produto_tamanho_id` — estável, como documenta o
   PAINEL.md §7.
-- Tema claro/escuro pelos mesmos tokens do painel; alternância no rodapé.
+- Mesmos tokens de tema do painel, mas a loja é fixada no claro (ver "Camada visual" acima).
 - Estados cobertos: esqueletos (`loading.tsx`), busca vazia, categoria vazia,
   item que saiu do catálogo dentro do carrinho, conta aguardando liberação,
   erro (`error.tsx`), 404 com navegação.

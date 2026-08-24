@@ -22,7 +22,7 @@ export function CartaoProduto({
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-borda/60 bg-superficie shadow-pousada transition duration-200 ease-out hover:-translate-y-1 hover:shadow-flutuante">
-      <div className="relative aspect-[3/4] overflow-hidden bg-superficie-2">
+      <div className="relative aspect-square overflow-hidden bg-white">
         {foto ? (
           <Image
             src={urlFoto(foto.storage_path)!}
@@ -30,7 +30,7 @@ export function CartaoProduto({
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             priority={prioridade}
-            className="object-cover transition duration-300 group-hover:scale-[1.03]"
+            className="object-contain p-3 transition duration-300 group-hover:scale-[1.02]"
           />
         ) : (
           <span className="flex h-full items-center justify-center text-xs text-tenue">

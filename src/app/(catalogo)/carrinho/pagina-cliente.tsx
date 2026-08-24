@@ -163,7 +163,7 @@ export function PaginaCarrinhoCliente() {
             >
               <Link
                 href={`/produto/${item.slug}`}
-                className="relative h-24 w-20 shrink-0 overflow-hidden rounded-xl border border-borda bg-superficie-2"
+                className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-borda bg-white"
               >
                 {item.foto && (
                   <Image
@@ -171,7 +171,7 @@ export function PaginaCarrinhoCliente() {
                     alt=""
                     fill
                     sizes="80px"
-                    className="object-cover"
+                    className="object-contain p-1"
                   />
                 )}
               </Link>

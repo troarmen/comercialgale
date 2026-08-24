@@ -147,40 +147,40 @@ export default async function PaginaInicial() {
           {destaqueFotos.length >= 3 && (
             <div className="relative hidden h-[460px] lg:block" aria-hidden="true">
               <div className="absolute left-0 top-14 w-48 -rotate-6 overflow-hidden rounded-2xl bg-white shadow-suave ring-1 ring-borda">
-                <div className="relative aspect-[3/4]">
+                <div className="relative aspect-square">
                   <Image
                     src={urlFoto(destaqueFotos[1].foto!.storage_path)!}
                     alt=""
                     fill
                     sizes="192px"
                     priority
-                    className="object-cover"
+                    className="object-contain p-2"
                   />
                 </div>
               </div>
 
               <div className="absolute left-1/2 top-0 z-10 w-72 -translate-x-1/2 rotate-1 overflow-hidden rounded-3xl bg-white shadow-flutuante ring-1 ring-borda">
-                <div className="relative aspect-[3/4]">
+                <div className="relative aspect-square">
                   <Image
                     src={urlFoto(destaqueFotos[0].foto!.storage_path)!}
                     alt=""
                     fill
                     sizes="288px"
                     priority
-                    className="object-cover"
+                    className="object-contain p-2"
                   />
                 </div>
               </div>
 
               <div className="absolute right-0 top-40 w-44 rotate-6 overflow-hidden rounded-2xl bg-white shadow-suave ring-1 ring-borda">
-                <div className="relative aspect-[3/4]">
+                <div className="relative aspect-square">
                   <Image
                     src={urlFoto(destaqueFotos[2].foto!.storage_path)!}
                     alt=""
                     fill
                     sizes="176px"
                     priority
-                    className="object-cover"
+                    className="object-contain p-2"
                   />
                 </div>
               </div>
@@ -218,7 +218,7 @@ export default async function PaginaInicial() {
                 href={`/produtos/${c.slug}`}
                 className="group overflow-hidden rounded-2xl border border-borda/60 bg-superficie shadow-pousada transition duration-200 ease-out hover:-translate-y-1 hover:shadow-flutuante"
               >
-                <div className="relative aspect-square overflow-hidden bg-superficie-2">
+                <div className="relative aspect-square overflow-hidden bg-white">
                   {foto && (
                     <Image
                       src={urlFoto(foto)!}
@@ -228,7 +228,7 @@ export default async function PaginaInicial() {
                       // no celular o hero não tem foto — os dois primeiros
                       // cartões de categoria são o LCP provável da página
                       priority={i < 2}
-                      className="object-cover transition duration-300 group-hover:scale-[1.04]"
+                      className="object-contain p-3 transition duration-300 group-hover:scale-[1.02]"
                     />
                   )}
                 </div>
