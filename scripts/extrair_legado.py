@@ -93,6 +93,24 @@ class Painel:
                 time.sleep(espera_s)
         return ""
 
+    def publica(self, pid):
+        """
+        Ficha pública do produto. É a única tela que lista a galeria — o
+        formulário do admin traz só a foto principal. O slug na URL é
+        decorativo: o legado resolve tudo pelo ID.
+        """
+        for tentativa in range(1, TENTATIVAS + 1):
+            try:
+                r = self.s.get(f"{BASE}/produto/{pid}/x", timeout=TIMEOUT)
+                # o legado serve a página em latin-1 mas declara utf-8
+                return r.content.decode("latin-1", "replace")
+            except Exception as e:
+                if tentativa == TENTATIVAS:
+                    log(f"  ficha pública {pid} falhou ({e}); segue só com o admin")
+                    return ""
+                time.sleep(2 ** tentativa)
+        return ""
+
     def grid(self, caminho, total=None):
         """Lê um DataTable server-side inteiro."""
         if total is None:
@@ -145,6 +163,20 @@ def campos(html):
         else:
             guarda(nome, "")
     return dados
+
+
+def eh_imagem(dados):
+    """
+    O servidor antigo NÃO devolve 404: para arquivo inexistente ele responde
+    200 com a página HTML do site. Checar o status é insuficiente — a única
+    prova é o número mágico do início do arquivo.
+    """
+    return (
+        dados.startswith(b"\xff\xd8\xff")                       # JPEG
+        or dados.startswith(b"\x89PNG\r\n\x1a\n")               # PNG
+        or dados.startswith(b"GIF8")                            # GIF
+        or (dados[:4] == b"RIFF" and dados[8:12] == b"WEBP")    # WebP
+    )
 
 
 def dinheiro(v):
@@ -246,6 +278,41 @@ def extrair_apoio(p):
 
 # ---------------------------------------------------------------------- produtos
 
+def fotos_do_produto(p, pid, html_admin):
+    """
+    Todas as fotos de um produto, em ordem, como caminhos relativos:
+        produto/nome.jpg          -> a principal
+        galeria/1691/nome.jpg     -> as demais
+
+    O formulário do admin mostra SÓ a principal: o campo é um único
+    `<input type="file" name="imagem">`. A galeria existe apenas na ficha
+    PÚBLICA, num diretório separado (`/arquivos/galeria/<id>/`), e foi por isso
+    que a primeira extração trouxe uma foto por produto — ela só olhava o
+    admin, e só o prefixo `arquivos/produto/`.
+
+    A principal costuma aparecer repetida dentro da galeria; a comparação é
+    pelo nome do arquivo, e a de `produto/` sempre vem primeiro.
+    """
+    def achar(texto):
+        return re.findall(r"arquivos/(produto|galeria/\d+)/((?:thumb/)?[^\"']+?)[\"']", texto)
+
+    principal, galeria = [], []
+    for origem in (html_admin, p.publica(pid)):
+        for pasta, arquivo in achar(origem):
+            if arquivo.lower().startswith("thumb"):
+                continue  # miniatura do mesmo arquivo, não é outra foto
+            (principal if pasta == "produto" else galeria).append(f"{pasta}/{arquivo}")
+
+    principal = list(dict.fromkeys(principal))
+    vistos = {os.path.basename(c) for c in principal}
+    saida = list(principal)
+    for c in dict.fromkeys(galeria):
+        if os.path.basename(c) not in vistos:
+            vistos.add(os.path.basename(c))
+            saida.append(c)
+    return saida
+
+
 def variacoes_do_html(html):
     i = html.find("OPCOES SALVAS")
     if i < 0:
@@ -295,10 +362,9 @@ def extrair_produtos(p, ids):
             lc = re.search(r"loadCategories\('(\d*)',\s*'(\d*)'\)", html)
             subcat = int(lc.group(2)) if lc and lc.group(2) else None
 
-            imgs = sorted({
-                i for i in re.findall(r"arquivos/produto/([^\"'\s>]+\.(?:jpg|jpeg|png|webp))", html, re.I)
-                if not i.lower().startswith("thumb")
-            })
+            # A ordem importa: a primeira é a principal. Não ordenar por nome —
+            # o legado numera as poses do fotógrafo fora de sequência.
+            imgs = fotos_do_produto(p, pid, html)
 
             reg = {
                 "legado_id": int(pid),
@@ -483,14 +549,21 @@ def baixar_imagens(p):
         destino = os.path.join(IMAGENS, nome)
         if os.path.exists(destino) and os.path.getsize(destino) > 0:
             continue
-        url = f"{BASE}/arquivos/produto/{quote(nome)}"
+        os.makedirs(os.path.dirname(destino), exist_ok=True)
+        # `nome` já vem com a pasta: produto/x.jpg ou galeria/1691/y.jpg
+        url = f"{BASE}/arquivos/" + "/".join(quote(parte) for parte in nome.split("/"))
         try:
             r = p.s.get(url, timeout=TIMEOUT)
-            if r.status_code == 200 and r.content:
+            if r.status_code != 200 or not r.content:
+                falhas.append({"tipo": "imagem", "id": nome, "erro": f"HTTP {r.status_code}"})
+            elif not eh_imagem(r.content):
+                # ARMADILHA DO LEGADO: arquivo inexistente não devolve 404 —
+                # devolve 200 com a página HTML do site. Confiar no status
+                # gravaria centenas de páginas HTML renomeadas para .jpg.
+                falhas.append({"tipo": "imagem", "id": nome, "erro": "não é imagem (HTML)"})
+            else:
                 with open(destino, "wb") as f:
                     f.write(r.content)
-            else:
-                falhas.append({"tipo": "imagem", "id": nome, "erro": f"HTTP {r.status_code}"})
         except Exception as e:
             falhas.append({"tipo": "imagem", "id": nome, "erro": str(e)})
         if n % 100 == 0:

@@ -14,6 +14,7 @@ Uso:
     python3 scripts/importar_catalogo.py           # tudo
     python3 scripts/importar_catalogo.py imagens   # só as fotos
 """
+import hashlib
 import io
 import json
 import os
@@ -222,6 +223,17 @@ def importar_produtos(m):
 
 # ---------------------------------------------------------------------- imagens
 
+def eh_imagem(dados):
+    """Número mágico do arquivo. Mesma checagem do extrator — ver o comentário
+    lá: o servidor antigo responde 200 com HTML quando o arquivo não existe."""
+    return (
+        dados.startswith(b"\xff\xd8\xff")
+        or dados.startswith(b"\x89PNG\r\n\x1a\n")
+        or dados.startswith(b"GIF8")
+        or (dados[:4] == b"RIFF" and dados[8:12] == b"WEBP")
+    )
+
+
 def converter(caminho):
     """JPEG/PNG original -> WebP redimensionado. Devolve os bytes."""
     with Image.open(caminho) as im:
@@ -239,47 +251,135 @@ def converter(caminho):
         return buf.getvalue()
 
 
+def imagens_existentes(produto_ids):
+    """
+    O que cada produto já tem em `produto_imagens`.
+
+    A chave de idempotência é o `legado_url` — a URL de origem no site antigo —
+    e NÃO a posição da foto na lista. A diferença não é acadêmica: em 5
+    produtos a principal em produção veio de um `...-(1).jpg` que o legado
+    apagou depois, e todas as fotos da galeria são novas. Numerar por posição
+    faria a primeira colidir com o `{slug}.webp` que já existe, e essa foto
+    seria silenciosamente descartada.
+    """
+    info, passo = {}, 500
+    ids = list(produto_ids)
+    for i in range(0, len(ids), passo):
+        lote = ids[i:i + passo]
+        r = S.get(
+            f"{URL}/rest/v1/produto_imagens",
+            params={"select": "produto_id,storage_path,legado_url,ordem,principal",
+                    "produto_id": f"in.({','.join(str(x) for x in lote)})"},
+            timeout=120,
+        )
+        if r.status_code >= 300:
+            raise SystemExit(f"não consegui ler produto_imagens: {r.text[:200]}")
+        for linha in r.json():
+            d = info.setdefault(linha["produto_id"],
+                                {"urls": set(), "paths": set(),
+                                 "tem_principal": False, "ordem": -1})
+            if linha.get("legado_url"):
+                d["urls"].add(linha["legado_url"])
+            d["paths"].add(linha["storage_path"])
+            d["tem_principal"] |= bool(linha["principal"])
+            d["ordem"] = max(d["ordem"], linha["ordem"])
+    return info
+
+
 def importar_imagens(m_prod, prods):
+    """
+    Sobe TODAS as fotos de cada produto, não só a primeira.
+
+    A versão anterior fazia `p["imagens"][0]` e gravava sempre em
+    `{slug}.webp` — um nome fixo por produto. Além de descartar a galeria,
+    o nome fixo faria as fotos se sobrescreverem se alguém tentasse subir
+    mais de uma. Agora a primeira mantém `{slug}.webp` (é a que já está em
+    produção, e o caminho não muda) e as demais viram `{slug}-2.webp`,
+    `{slug}-3.webp`…
+
+    Idempotente: consulta o que já existe em `produto_imagens` e só insere o
+    que falta, então dá para rodar de novo sem duplicar nada.
+    """
     log(f"Imagens: {len(prods)} produtos")
-    registros, enviados, pulados, falhas = [], 0, 0, []
+    registros, enviados, repetidas, falhas = [], 0, 0, []
     economia_de, economia_para = 0, 0
+
+    existentes = imagens_existentes(set(m_prod.values()))
+    vazio = {"urls": set(), "paths": set(), "tem_principal": False, "ordem": -1}
 
     for n, p in enumerate(prods, 1):
         if not p.get("imagens"):
             continue
-        origem = os.path.join(IMAGENS, p["imagens"][0])
-        if not os.path.exists(origem):
-            falhas.append((p["legado_id"], "arquivo ausente"))
-            continue
+        produto_id = m_prod[p["legado_id"]]
+        info = existentes.setdefault(produto_id, dict(vazio, urls=set(), paths=set()))
+        vistos = set()   # hash do original, dentro do mesmo produto
+        slot = 1
 
-        destino = f"{p['slug_final']}.webp"
-        try:
-            dados = converter(origem)
-            economia_de += os.path.getsize(origem)
-            economia_para += len(dados)
+        for relativo in p["imagens"]:
+            legado_url = f"https://comercialgale.com.br/arquivos/{relativo}"
+            if legado_url in info["urls"]:
+                continue   # já importada numa execução anterior
 
-            r = S.post(
-                f"{URL}/storage/v1/object/produtos/{destino}",
-                headers={"Authorization": f"Bearer {KEY}", "apikey": KEY,
-                         "Content-Type": "image/webp",
-                         "x-upsert": "true"},
-                data=dados, timeout=120,
-            )
-            if r.status_code >= 300:
-                falhas.append((p["legado_id"], f"upload HTTP {r.status_code}"))
+            origem = os.path.join(IMAGENS, relativo)
+            if not os.path.exists(origem):
+                falhas.append((p["legado_id"], f"ausente: {relativo}"))
                 continue
-            enviados += 1
-            registros.append({
-                "produto_id": m_prod[p["legado_id"]],
-                "storage_path": destino,
-                "alt": f"{p['titulo']} {p['modelo']}".strip(),
-                "ordem": 0, "principal": True,
-                "legado_url": f"https://comercialgale.com.br/arquivos/produto/{p['imagens'][0]}",
-            })
-        except Exception as e:
-            falhas.append((p["legado_id"], str(e)[:80]))
+
+            with open(origem, "rb") as fh:
+                bruto = fh.read()
+            if not eh_imagem(bruto):
+                # o legado devolve 200 com HTML para arquivo inexistente;
+                # se um desses escapou para o disco, ele morre aqui
+                falhas.append((p["legado_id"], f"não é imagem: {relativo}"))
+                continue
+            digest = hashlib.md5(bruto).hexdigest()
+            if digest in vistos:
+                repetidas += 1
+                continue   # mesma foto servida em dois caminhos
+            vistos.add(digest)
+
+            # primeiro nome livre: nunca sobrescreve o que já está no ar
+            while True:
+                destino = f"{p['slug_final']}.webp" if slot == 1 else f"{p['slug_final']}-{slot}.webp"
+                if destino not in info["paths"]:
+                    break
+                slot += 1
+
+            try:
+                dados = converter(origem)
+                economia_de += len(bruto)
+                economia_para += len(dados)
+
+                r = S.post(
+                    f"{URL}/storage/v1/object/produtos/{destino}",
+                    headers={"Authorization": f"Bearer {KEY}", "apikey": KEY,
+                             "Content-Type": "image/webp",
+                             "x-upsert": "true"},
+                    data=dados, timeout=120,
+                )
+                if r.status_code >= 300:
+                    falhas.append((p["legado_id"], f"upload HTTP {r.status_code}"))
+                    continue
+                enviados += 1
+                info["ordem"] += 1
+                info["paths"].add(destino)
+                info["urls"].add(legado_url)
+                # produto_imagens_principal_uniq admite UMA principal por
+                # produto: só assume quem chega e não encontra nenhuma
+                principal = not info["tem_principal"]
+                info["tem_principal"] = True
+                registros.append({
+                    "produto_id": produto_id,
+                    "storage_path": destino,
+                    "alt": f"{p['titulo']} {p['modelo']}".strip(),
+                    "ordem": info["ordem"],
+                    "principal": principal,
+                    "legado_url": legado_url,
+                })
+            except Exception as e:
+                falhas.append((p["legado_id"], str(e)[:80]))
         if n % 100 == 0:
-            log(f"  {n}/{len(prods)}")
+            log(f"  {n}/{len(prods)} produtos · {enviados} fotos enviadas")
 
     # produto_imagens não tem legado_id; o conflito é produto_id+principal
     if registros:
@@ -295,7 +395,7 @@ def importar_imagens(m_prod, prods):
     if economia_de:
         log(f"  peso: {economia_de/1e6:.1f} MB -> {economia_para/1e6:.1f} MB "
             f"({100 - economia_para*100/economia_de:.0f}% menor)")
-    log(f"  enviadas {enviados} | pulados {pulados} | falhas {len(falhas)}")
+    log(f"  enviadas {enviados} | duplicadas ignoradas {repetidas} | falhas {len(falhas)}")
     for f in falhas[:10]:
         log(f"    {f}")
     return falhas
