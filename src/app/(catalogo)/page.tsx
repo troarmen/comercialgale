@@ -16,6 +16,7 @@ import {
   listarProdutos,
   marcasComContagem,
   precosPorProduto,
+  produtoPorSlug,
   sessaoCatalogo,
 } from "@/lib/catalogo";
 import { CONTATO } from "@/lib/contato";
@@ -68,13 +69,38 @@ export default async function PaginaInicial() {
   const fotoDe = new Map(fotosCategorias.map((f) => [f.id, f.foto]));
   const clienteAtivo = !!cliente && cliente.status === "ativo";
 
-  const destaqueFotos = lancamentos.produtos
-    .map((p) => ({
-      produto: p,
-      foto: p.produto_imagens.find((i) => i.principal) ?? p.produto_imagens[0],
-    }))
-    .filter((d) => d.foto)
-    .slice(0, 3);
+  /*
+   * Fotos do hero: três peças escolhidas a dedo, na ordem [centro, esquerda,
+   * direita] que a composição abaixo consome. São produtos de fundo branco de
+   * estúdio e de categorias diferentes — meia, renda, meia — para o
+   * empilhamento ler como variedade de estoque.
+   *
+   * Por que fixo, e não automático: a origem natural seria `lancamentos`, mas
+   * a migração do sistema antigo não trouxe a marcação (`lancamento` está
+   * false nos 541 produtos) e o hero ficava sem foto nenhuma. A ordem
+   * alfabética do catálogo, por sua vez, entregava duas bermudas quase iguais
+   * lado a lado. Se algum destes produtos for desativado, o catálogo entra
+   * como rede de segurança e o hero continua existindo.
+   */
+  const HERO_SLUGS = [
+    "tanga-adulto-3600",
+    "meia-soquete-feminina-mf-302-a",
+    "meia-soquete-feminina-mf-307",
+  ];
+
+  const escolhidos = (await Promise.all(HERO_SLUGS.map(produtoPorSlug)))
+    .map((p) => ({ foto: p?.produto_imagens[0] }))
+    .filter((d) => d.foto);
+
+  const destaqueFotos =
+    escolhidos.length >= 3
+      ? escolhidos
+      : (await listarProdutos({ porPagina: 12, ordem: "destaques" })).produtos
+          .map((p) => ({
+            foto: p.produto_imagens.find((i) => i.principal) ?? p.produto_imagens[0],
+          }))
+          .filter((d) => d.foto)
+          .slice(0, 3);
 
   const numeros = [
     { valor: "48+", rotulo: "anos de tradição" },
