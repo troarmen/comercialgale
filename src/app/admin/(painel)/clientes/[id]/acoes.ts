@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { enviarLinkSenha } from "@/lib/email";
+import { gerarLinkSenha, linkSenhaLiberado } from "@/lib/links-senha";
 import { senhaProvisoria } from "@/lib/senha";
 import { exigirAdmin } from "@/lib/sessao";
 import { criarClienteAdmin } from "@/lib/supabase/server";
@@ -178,12 +180,22 @@ export async function revogarAcesso(clienteId: number): Promise<Resultado> {
   return { ok: true };
 }
 
-/** Envia o e-mail de redefinição de senha para o cliente. */
+/**
+ * Envia ao cliente o link para criar uma senha nova.
+ *
+ * Não usa resetPasswordForEmail: com PKCE, o link só funcionaria no navegador
+ * de quem pediu — o do Arthur. Ver src/lib/links-senha.ts.
+ */
 export async function reenviarSenha(email: string): Promise<Resultado> {
   const sessao = await exigirAdmin();
   if (!sessao) return { erro: "Sessão expirada. Entre novamente." };
 
-  const { error } = await sessao.supabase.auth.resetPasswordForEmail(email);
-  if (error) return { erro: error.message };
+  if (!(await linkSenhaLiberado(email))) {
+    return { erro: "Um link foi enviado há menos de 1 minuto. Aguarde um pouco." };
+  }
+  const gerado = await gerarLinkSenha(email);
+  if (!gerado) return { erro: "Não encontramos login com este e-mail." };
+  const enviado = await enviarLinkSenha(email, gerado.nome, gerado.link, "redefinir");
+  if (!enviado) return { erro: "O e-mail não pôde ser enviado. Confira o SMTP." };
   return { ok: true };
 }

@@ -568,6 +568,23 @@ end $$;
 revoke execute on function public.mudar_status_pedido(bigint, public.pedido_status) from public, anon;
 grant  execute on function public.mudar_status_pedido(bigint, public.pedido_status) to authenticated;
 
+-- Trava de reenvio do link de senha (migração 009): o generateLink não tem
+-- limite de frequência. Lê auth.users.recovery_sent_at; só a service_role
+-- executa. E-mail sem conta devolve true (a tela responde igual).
+create or replace function public.link_senha_liberado(p_email text)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select coalesce(
+    (select recovery_sent_at < now() - interval '60 seconds'
+            or recovery_sent_at is null
+       from auth.users
+      where lower(email) = lower(trim(p_email))
+      limit 1),
+    true);
+$$;
+
+revoke execute on function public.link_senha_liberado(text) from public, anon, authenticated;
+grant  execute on function public.link_senha_liberado(text) to service_role;
+
 
 -- =============================================================================
 -- 8. PREÇO — TRAVA DE COLUNA

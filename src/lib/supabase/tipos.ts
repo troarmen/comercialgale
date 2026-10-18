@@ -750,6 +750,7 @@ export type Database = {
     Functions: {
       is_admin: { Args: never; Returns: boolean }
       is_equipe: { Args: never; Returns: boolean }
+      link_senha_liberado: { Args: { p_email: string }; Returns: boolean }
       meu_cliente_id: { Args: never; Returns: number }
       mudar_status_pedido: {
         Args: {

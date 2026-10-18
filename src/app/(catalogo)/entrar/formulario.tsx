@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { criarClienteNavegador } from "@/lib/supabase/client";
@@ -86,9 +87,17 @@ export function FormularioEntrar({ destino }: { destino: string }) {
         {enviando ? "Entrando…" : "Entrar"}
       </button>
 
+      <p className="text-center text-sm">
+        <Link
+          href="/esqueci-senha"
+          className="font-medium text-acento-texto transition hover:text-acento-forte"
+        >
+          Esqueci minha senha
+        </Link>
+      </p>
       <p className="text-center text-xs leading-relaxed text-suave">
-        Esqueceu a senha ou ainda não tem login? Fale com a nossa equipe pelo
-        WhatsApp que a gente resolve.
+        Ainda não tem login? Fale com a nossa equipe pelo WhatsApp que a gente
+        resolve.
       </p>
     </form>
   );

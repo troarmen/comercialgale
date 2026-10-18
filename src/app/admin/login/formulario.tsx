@@ -59,6 +59,15 @@ export function FormularioLogin({ destino }: { destino: string }) {
       )}
 
       <Botao />
+
+      {/* Mesmo fluxo do lojista: o link leva a /definir-senha, que devolve a
+          equipe para o painel. */}
+      <a
+        href="/esqueci-senha"
+        className="text-center text-sm text-suave transition hover:text-texto"
+      >
+        Esqueci minha senha
+      </a>
     </form>
   );
 }

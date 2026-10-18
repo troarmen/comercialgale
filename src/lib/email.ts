@@ -122,3 +122,70 @@ export async function enviarEmailsDePedido(
   }
   return { enviado: falhas.length < resultados.length };
 }
+
+// ------------------------------------------------------------- link de senha
+
+export type MotivoLinkSenha = "redefinir" | "acesso_liberado" | "convite_equipe";
+
+const TEXTO_LINK: Record<MotivoLinkSenha, { assunto: string; abertura: string }> = {
+  redefinir: {
+    assunto: "Redefinir a sua senha — Comercial Galé",
+    abertura:
+      "Recebemos um pedido para redefinir a senha da sua conta. Se foi você, crie a nova senha pelo link abaixo.",
+  },
+  acesso_liberado: {
+    assunto: "Seu acesso à Comercial Galé foi liberado",
+    abertura:
+      "Seu cadastro foi aprovado! Com o login você vê os preços de atacado e fecha pedidos pelo site. Para começar, crie a sua senha pelo link abaixo.",
+  },
+  convite_equipe: {
+    assunto: "Seu acesso ao painel da Comercial Galé",
+    abertura:
+      "Você foi cadastrado na equipe da Comercial Galé e já pode consultar os pedidos no painel. Para começar, crie a sua senha pelo link abaixo.",
+  },
+};
+
+/**
+ * Link de uso único para a pessoa criar ou trocar a senha. O link vem de
+ * `gerarLinkSenha` (src/lib/links-senha.ts) e vale 1 hora.
+ *
+ * Devolve false se não houver SMTP ou o envio falhar — quem chama decide o
+ * que dizer na tela.
+ */
+export async function enviarLinkSenha(
+  para: string,
+  nome: string | null,
+  link: string,
+  motivo: MotivoLinkSenha,
+) {
+  const t = transporte();
+  if (!t) {
+    console.warn(`[email] SMTP não configurado — link de senha (${motivo}) não enviado.`);
+    return false;
+  }
+
+  const { assunto, abertura } = TEXTO_LINK[motivo];
+  const texto = `Olá${nome ? `, ${nome}` : ""}!
+
+${abertura}
+
+${link}
+
+O link vale por 1 hora e funciona uma vez só. Se expirar, peça outro em ${process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.comercialgale.com.br"}/esqueci-senha.
+${motivo === "redefinir" ? "\nNão pediu? Pode ignorar este e-mail — a sua senha continua a mesma.\n" : ""}
+—
+${CONTATO.nome} · ${CONTATO.telefoneFixo} · WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}`;
+
+  try {
+    await t.sendMail({
+      from: process.env.EMAIL_REMETENTE ?? `Comercial Galé <${CONTATO.email}>`,
+      to: para,
+      subject: assunto,
+      text: texto,
+    });
+    return true;
+  } catch (erro) {
+    console.error(`[email] falha no link de senha (${motivo}):`, erro);
+    return false;
+  }
+}
