@@ -181,26 +181,25 @@ concluido` (+ `cancelado`), e quem move é o Arthur pelo painel.
 
 ---
 
-## 5. O e-mail NÃO existe ainda
+## 5. E-mail
 
-**Nada no projeto envia e-mail de pedido.** A configuração está lá
-(`emails_notificacao` = `contato@comercialgale.com.br`), a tela do painel
-permite editar, mas não há uma linha de código de envio. Como o disparo
-acontece no fechamento do pedido, ele pertence ao catálogo.
+Existe e mora no catálogo: `src/lib/email.ts` (nodemailer, SMTP por variável
+de ambiente — em produção, o **Brevo**). Detalhes em CATALOGO.md §4; como pôr
+no ar (domínio no Brevo, DNS, variáveis) em [DEPLOY.md](DEPLOY.md).
 
-O que precisa ser feito:
+Para quem mexe no painel, o que importa:
 
-- Ao gravar o pedido, enviar para **o cliente** e para cada endereço em
-  `configuracoes.emails_notificacao` (o painel lê essa chave; o catálogo
-  precisará de acesso a ela — hoje ela **não** é pública, então use uma Server
-  Action/rota no servidor com service_role, nunca do navegador).
-- Conteúdo: número do pedido, itens com ref/tamanho/qtd, total, dados do
-  cliente e o recado de que o Arthur entra em contato para combinar o
-  pagamento.
-- Pendência de infraestrutura **fora do código**: o domínio ainda não tem
-  SPF/DKIM configurados. Sem isso o e-mail cai em spam — inclusive o de
-  redefinição de senha que o painel já usa hoje pelo SMTP padrão do Supabase
-  (que também tem limite baixo demais para produção).
+- **Nenhum e-mail de senha passa pelo Supabase.** Criar login (cliente ou
+  colaborador) e "Enviar link para criar nova senha" usam
+  `auth.admin.generateLink` + **link próprio** enviado pelo nosso SMTP
+  (`src/lib/links-senha.ts`). Não use `resetPasswordForEmail`: com o
+  `@supabase/ssr` ele usa PKCE, e o link só funciona no navegador de quem
+  pediu — o do Arthur.
+- **Ninguém recebe senha provisória.** O login nasce sem senha; a pessoa cria
+  a dela pelo link (vale 1 h, uso único). Se o e-mail falhar, o painel mostra
+  o link para o Arthur copiar e mandar por WhatsApp.
+- `emails_notificacao` recebe o aviso de **pedido novo** e de **cadastro novo
+  para aprovar**.
 
 ---
 
@@ -277,7 +276,8 @@ Onde o catálogo encosta no painel, e pode precisar que ele seja complementado:
 ## 8. Migrações
 
 `db/schema.sql` é a fonte de verdade e já reflete tudo. As migrações em
-`db/migracoes/` são o histórico incremental, **todas já aplicadas**:
+`db/migracoes/` são o histórico incremental, **todas aplicadas em produção**
+(a 009 entra junto com o deploy da rodada backend — ver DEPLOY.md):
 
 | # | O quê |
 |---|---|
@@ -285,6 +285,11 @@ Onde o catálogo encosta no painel, e pode precisar que ele seja complementado:
 | 002 | `clientes.legado_id` como constraint (não índice parcial — `ON CONFLICT` rejeita) + política de config pública |
 | 003 | `precos_visiveis` passa a distinguir preço próprio de herdado |
 | 004 | `clientes.cadastrado_em` — data real de cadastro vinda do legado |
+| 005 | **segurança**: papel do usuário novo só via `raw_app_meta_data` (antes, qualquer signup podia nascer admin) |
+| 006 | enum `app_role` ganha `colaborador` (roda sozinha, fora de transação) |
+| 007 | `is_equipe()` + SELECT em `pedidos`/`pedido_itens` para a equipe |
+| 008 | `mudar_status_pedido()`: colaborador muda SÓ a situação do pedido, com log |
+| 009 | `link_senha_liberado()`: trava de 60 s por e-mail para o link de senha |
 
 Não há CLI de migração: o SQL é rodado à mão no SQL Editor do Supabase.
 Escreva migração nova como arquivo numerado, dentro de `begin; ... commit;`.
@@ -359,3 +364,39 @@ O sistema antigo **ainda está no ar** e recebendo pedidos. Antes do corte:
   confirmado que a tentativa anterior (revoke só de coluna) *não* fechava.
 - **16 telas do painel**: carregam sem erro de console, e o guard de sessão
   redireciona todas para o login preservando o destino.
+
+---
+
+## 12. Papéis do painel: admin e colaborador
+
+Pedido do cliente (out/2026): funcionários que consultam pedidos sem mexer no
+resto. `profiles.role` ∈ `admin` · `colaborador` · `cliente`.
+
+| | admin | colaborador |
+|---|---|---|
+| Pedidos: lista e ficha | ✓ | ✓ — cliente exibido pelo `snapshot_cliente` |
+| Mudar a situação do pedido | ✓ | ✓ — via `mudar_status_pedido()`, com log |
+| Anotações internas, confirmar vínculo | ✓ | só lê as anotações |
+| Clientes, produtos, cadastros, configurações, equipe, início | ✓ | redireciona para Pedidos |
+
+**Onde cada camada decide** — leia antes de criar tela ou action nova:
+
+- **Banco (a proteção de verdade).** `is_equipe()` dá SELECT em `pedidos` e
+  `pedido_itens`; NADA de `clientes` (por isso o snapshot). A única escrita do
+  colaborador é a função `mudar_status_pedido` — política de UPDATE não
+  serve: trava de coluna vale por papel do banco, e admin e colaborador são
+  ambos `authenticated`.
+- **Server Actions.** O layout do painel **não protege action** — ela é um
+  endpoint próprio, chamável por qualquer sessão (inclusive de lojista). Toda
+  action nova começa com `exigirAdmin()` (ou `exigirEquipe()`, se o
+  colaborador também usa) de `src/lib/sessao.ts`. Isso já furou uma vez:
+  `subirFoto`/`excluirFoto` só checavam sessão e usavam service_role no
+  Storage — lojista logado apagava foto de produto.
+- **Telas.** Seção só de admin tem um `layout.tsx` de três linhas com
+  `exigirAdminPagina()` (ver `produtos/layout.tsx`). O menu esconde o resto.
+
+**Criar colaborador:** painel → Equipe. O GoTrue grava o `app_metadata` num
+UPDATE *depois* do insert, então o gatilho `handle_new_user` sempre cria o
+profile como `cliente`; quem promove é `criarColaborador`, com a service_role.
+**Promover alguém a admin** continua sendo feito à mão no banco, de propósito:
+`update profiles set role = 'admin' where id = …`.

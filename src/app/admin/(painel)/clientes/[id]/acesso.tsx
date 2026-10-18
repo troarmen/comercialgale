@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Aviso } from "@/components/cadastro-ui";
+import { ResultadoConvite } from "@/components/resultado-convite";
 import { criarAcesso, reenviarSenha, revogarAcesso } from "./acoes";
 
 export function GerenciarAcesso({
@@ -17,39 +18,22 @@ export function GerenciarAcesso({
 }) {
   const [pendente, iniciar] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
-  const [senha, setSenha] = useState<string | null>(null);
-  const [enviado, setEnviado] = useState(false);
+  const [convite, setConvite] = useState<{
+    titulo: string;
+    emailEnviado: boolean;
+    link?: string;
+  } | null>(null);
   const [emailNovo, setEmailNovo] = useState(email ?? "");
 
-  if (senha) {
+  if (convite) {
     return (
-      <div className="rounded-xl border border-ok-texto/30 bg-ok-fundo p-4">
-        <p className="text-sm font-semibold text-ok-texto">Login criado</p>
-        <p className="mt-1 text-sm text-ok-texto/90">
-          Passe estes dados ao cliente. A senha aparece uma vez só.
-        </p>
-        <dl className="mt-3 space-y-1.5 rounded-lg bg-superficie p-3 text-sm">
-          <div className="flex gap-2">
-            <dt className="text-tenue">E-mail:</dt>
-            <dd className="break-all font-medium text-texto">{emailNovo}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="text-tenue">Senha:</dt>
-            <dd className="select-all font-mono font-medium text-texto">
-              {senha}
-            </dd>
-          </div>
-        </dl>
-        <button
-          type="button"
-          onClick={() => {
-            navigator.clipboard?.writeText(`E-mail: ${emailNovo}\nSenha: ${senha}`);
-          }}
-          className="mt-3 h-9 rounded-lg border border-ok-texto/40 px-3.5 text-sm font-medium text-ok-texto transition hover:bg-ok-texto/10"
-        >
-          Copiar
-        </button>
-      </div>
+      <ResultadoConvite
+        titulo={convite.titulo}
+        email={emailNovo || email || ""}
+        emailEnviado={convite.emailEnviado}
+        link={convite.link}
+        aoFechar={() => setConvite(null)}
+      />
     );
   }
 
@@ -60,7 +44,8 @@ export function GerenciarAcesso({
         <p className="mt-1 mb-3 text-sm leading-relaxed text-suave">
           Este cliente ainda não tem login, então navega no catálogo{" "}
           <strong className="font-medium text-texto">sem ver preço</strong>.
-          Criar o login libera os valores para ele.
+          Criar o login libera os valores: ele recebe por e-mail o link para
+          criar a própria senha.
         </p>
 
         <label className="flex flex-col gap-1.5">
@@ -87,12 +72,18 @@ export function GerenciarAcesso({
             iniciar(async () => {
               const r = await criarAcesso(clienteId, emailNovo);
               setErro(r.erro ?? null);
-              if (r.senha) setSenha(r.senha);
+              if (r.ok) {
+                setConvite({
+                  titulo: "Login criado",
+                  emailEnviado: r.emailEnviado ?? false,
+                  link: r.link,
+                });
+              }
             })
           }
           className="mt-3 h-10 w-full rounded-lg bg-acento text-sm font-semibold text-white transition hover:bg-acento-forte disabled:opacity-50"
         >
-          {pendente ? "Criando…" : "Criar login e liberar preços"}
+          {pendente ? "Criando…" : "Criar login e enviar convite"}
         </button>
       </div>
     );
@@ -120,11 +111,6 @@ export function GerenciarAcesso({
           <Aviso mensagem={erro} />
         </div>
       )}
-      {enviado && (
-        <p className="mt-3 text-sm text-ok-texto">
-          E-mail de redefinição enviado.
-        </p>
-      )}
 
       <div className="mt-3 flex flex-col gap-2">
         <button
@@ -134,12 +120,18 @@ export function GerenciarAcesso({
             iniciar(async () => {
               const r = await reenviarSenha(email!);
               setErro(r.erro ?? null);
-              setEnviado(!r.erro);
+              if (r.ok) {
+                setConvite({
+                  titulo: "Link enviado",
+                  emailEnviado: r.emailEnviado ?? false,
+                  link: r.link,
+                });
+              }
             })
           }
           className="h-9 rounded-lg border border-borda px-3.5 text-sm font-medium text-texto transition hover:bg-superficie-2 disabled:opacity-50"
         >
-          Enviar e-mail para redefinir senha
+          Enviar link para criar nova senha
         </button>
         <button
           type="button"

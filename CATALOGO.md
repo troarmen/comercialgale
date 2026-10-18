@@ -18,6 +18,7 @@ das mesmas travas e dos mesmos tokens de tema — sem tocar em nada do painel.
 | `/empresa` · `/contato` | institucional (texto real do site antigo) |
 | `/cadastro` | solicitação de cadastro → `clientes` com status `incompleto` |
 | `/entrar` · `/conta` | login do lojista (Supabase Auth) e ficha do próprio cadastro |
+| `/esqueci-senha` · `/definir-senha` | pedir link por e-mail; criar/trocar a senha (lojista e equipe) |
 | `/carrinho` | grade do pedido, pedido mínimo e fechamento |
 | `/sitemap.xml` · `/robots.txt` | gerados do banco (`src/app/sitemap.ts`, `robots.ts`) |
 
@@ -55,19 +56,37 @@ em not-found com `noindex`).
 - O gatilho `t_pedido_numero` numera o pedido (o insert manda `numero: null`
   com cast — o tipo gerado não enxerga gatilho).
 
-## 4. E-mail de pedido
+## 4. E-mails
 
-`src/lib/email.ts` (nodemailer). Envia a confirmação ao cliente e cópia para
-cada endereço em `configuracoes.emails_notificacao` (lida com service role —
-a chave não é pública). **Falha de e-mail não desfaz pedido** — é logada.
+`src/lib/email.ts` (nodemailer, texto simples). **Falha de e-mail nunca
+desfaz nada** — pedido e cadastro já estão no banco; o erro é logado.
 
-Variáveis: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`/`SMTP_SENHA` (opcionais — um
-relay autorizado por IP dispensa), `EMAIL_REMETENTE`. Em desenvolvimento, o
-Supabase local expõe um Mailpit (SMTP `127.0.0.1:54325`, UI `:54324` — o
-`smtp_port` foi habilitado em `supabase/config.toml`).
+| Quando | Para quem | Onde dispara |
+|---|---|---|
+| Pedido fechado | lojista + `emails_notificacao` | `carrinho/acoes.ts` |
+| Cadastro enviado | lojista ("recebemos") + `emails_notificacao` ("novo cadastro para aprovar", com link para a ficha; responder cai no lojista) | `cadastro/acoes.ts`, via `after()` — o lojista não espera o SMTP |
+| Arthur cria o login | lojista: "acesso liberado" + link para criar a senha | painel, `clientes/[id]/acoes.ts` |
+| Arthur cria colaborador | colaborador: convite + link | painel, `equipe/acoes.ts` |
+| "Esqueci minha senha" / reenvio pelo painel | quem pediu | `/esqueci-senha`, painel |
 
-**Pendências fora do código** (já apontadas no PAINEL.md §5): SPF/DKIM do
-domínio e um SMTP de produção.
+**Links de senha** (`src/lib/links-senha.ts`): `generateLink` + link
+próprio para `/definir-senha?token_hash=…`. Três decisões não óbvias:
+
+- **Não usamos `resetPasswordForEmail`**: com PKCE, o link só abriria no
+  navegador de quem pediu (o do Arthur, quando o pedido sai do painel).
+- **Abrir o link não gasta o token** — só o envio do formulário. Filtros de
+  e-mail corporativo (Outlook Safe Links) abrem os links para inspecionar; se
+  a abertura consumisse o token, o lojista receberia "link expirado".
+- **Trava de 60 s por e-mail** (migração 009): o `generateLink`, ao
+  contrário do reset do Supabase, não tem limite próprio — sem trava, dava
+  para inundar a caixa de um lojista.
+
+`/esqueci-senha` responde igual com ou sem conta (não revela quem é cliente).
+
+Variáveis: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`/`SMTP_SENHA`,
+`EMAIL_REMETENTE`, `NEXT_PUBLIC_SITE_URL` (monta os links). Produção:
+**Brevo** — passo a passo em [DEPLOY.md](DEPLOY.md). Em desenvolvimento, o
+Supabase local expõe um Mailpit (SMTP `127.0.0.1:54325`, UI `:54324`).
 
 ## 5. Cadastro de lojista
 
@@ -76,6 +95,8 @@ role (a tabela não tem INSERT para anon, de propósito — o formulário é a �
 porta e valida no servidor). Honeypot contra robô; documento duplicado recebe
 mensagem amigável em vez de duplicar. A solicitação aparece no painel em
 Clientes, onde o Arthur aprova e cria o login — fluxo que o painel já tem.
+O lojista recebe "recebemos o seu cadastro" e a casa, o aviso para aprovar
+(§4).
 
 ## 6. SEO
 
@@ -164,10 +185,8 @@ Clientes, onde o Arthur aprova e cria o login — fluxo que o painel já tem.
   QUANDO existem e cai para destaques — em produção `lancamento=false` em
   todo o catálogo (migração não trouxe a flag; ver nota no código).
 
-**Fora desta rodada (backend, próxima)**: e-mails de confirmação não chegam
-(SMTP de produção nunca configurado + SPF/DKIM — §4 deste doc); login
-restrito para colaboradores verem pedidos sem editar (novo papel no painel +
-políticas RLS — decisão de modelagem com o painel).
+**Rodada backend (18/10/2026)**: e-mails (§4 deste doc + DEPLOY.md) e papel
+colaborador no painel (PAINEL.md §12).
 
 ### Demais decisões
 

@@ -1,3 +1,4 @@
+import { enviarLinkSenha, type MotivoLinkSenha } from "@/lib/email";
 import { criarClienteAdmin } from "@/lib/supabase/server";
 
 /**
@@ -48,4 +49,24 @@ export async function linkSenhaLiberado(email: string) {
     return true;
   }
   return data !== false;
+}
+
+export type ResultadoConvite =
+  | { emailEnviado: true }
+  | { emailEnviado: false; link: string }
+  | { erro: string };
+
+/**
+ * Gera o link e manda por e-mail. Se o e-mail não sair (SMTP fora, caixa
+ * recusou), devolve o LINK para a tela do painel mostrar — o Arthur copia e
+ * manda por WhatsApp. Nunca deixa quem está no painel sem saída.
+ */
+export async function convidarComLink(
+  email: string,
+  motivo: MotivoLinkSenha,
+): Promise<ResultadoConvite> {
+  const gerado = await gerarLinkSenha(email);
+  if (!gerado) return { erro: "Não foi possível gerar o link de acesso." };
+  const enviado = await enviarLinkSenha(email, gerado.nome, gerado.link, motivo);
+  return enviado ? { emailEnviado: true } : { emailEnviado: false, link: gerado.link };
 }

@@ -1,7 +1,7 @@
 "use server";
 
 import { configPublica } from "@/lib/catalogo";
-import { enviarEmailsDePedido } from "@/lib/email";
+import { emailsDaCasa, enviarEmailsDePedido } from "@/lib/email";
 import { criarClienteAdmin, criarClienteServidor } from "@/lib/supabase/server";
 
 /**
@@ -240,16 +240,8 @@ export async function fecharPedido(
     detalhes: { numero: pedido.numero, origem: "catalogo" },
   });
 
-  // E-mails: para o cliente e para a casa. `emails_notificacao` não é chave
-  // pública — daí o cliente admin. Falha de e-mail NÃO desfaz o pedido.
-  const { data: configEmails } = await admin
-    .from("configuracoes")
-    .select("valor")
-    .eq("chave", "emails_notificacao")
-    .maybeSingle();
-  const emailsDaCasa = Array.isArray(configEmails?.valor)
-    ? (configEmails.valor as string[]).filter((e) => typeof e === "string" && e.includes("@"))
-    : [];
+  // E-mails: para o cliente e para a casa. Falha de e-mail NÃO desfaz o pedido.
+  const destinosDaCasa = await emailsDaCasa();
 
   try {
     await enviarEmailsDePedido(
@@ -269,7 +261,7 @@ export async function fecharPedido(
         totalAtacado,
         totalPecas: linhas.reduce((s, l) => s + l.pecas_no_kit * l.qtd_kits, 0),
       },
-      emailsDaCasa,
+      destinosDaCasa,
     );
   } catch (e) {
     console.error("[pedido] e-mail falhou (pedido mantido):", e);

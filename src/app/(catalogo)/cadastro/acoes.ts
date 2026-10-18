@@ -1,5 +1,7 @@
 "use server";
 
+import { after } from "next/server";
+import { enviarEmailsDeCadastro } from "@/lib/email";
 import { criarClienteAdmin } from "@/lib/supabase/server";
 
 /**
@@ -74,11 +76,14 @@ export async function solicitarCadastro(
     };
   }
 
-  const { error } = await supabase.from("clientes").insert({
+  const cidade = texto("cidade") || null;
+  const nomeFantasia = texto("nome_fantasia") || null;
+
+  const { data: criado, error } = await supabase.from("clientes").insert({
     status: "incompleto",
     tipo_pessoa: tipoPessoa,
     nome,
-    nome_fantasia: texto("nome_fantasia") || null,
+    nome_fantasia: nomeFantasia,
     documento,
     inscricao_estadual: texto("inscricao_estadual", 30) || null,
     email,
@@ -89,18 +94,35 @@ export async function solicitarCadastro(
     numero: texto("numero", 20) || null,
     complemento: texto("complemento") || null,
     bairro: texto("bairro") || null,
-    cidade: texto("cidade") || null,
+    cidade,
     uf: UFS.has(uf) ? uf : null,
     observacoes: "Solicitação enviada pelo site.",
-  });
+  }).select("id").single();
 
-  if (error) {
+  if (error || !criado) {
     console.error("[cadastro] falha ao gravar solicitação:", error);
     return {
       ok: false,
       erro: "Não conseguimos enviar agora. Tente de novo ou chame no WhatsApp.",
     };
   }
+
+  // Confirmação ao lojista + aviso para o Arthur aprovar. Vai DEPOIS da
+  // resposta (after): o lojista não espera o SMTP, e falha de e-mail não
+  // desfaz o cadastro — ele já está no painel.
+  after(() =>
+    enviarEmailsDeCadastro({
+      id: criado.id,
+      nome,
+      nomeFantasia,
+      tipoPessoa,
+      documento,
+      email,
+      telefone,
+      cidade,
+      uf: UFS.has(uf) ? uf : null,
+    }),
+  );
 
   return { ok: true };
 }

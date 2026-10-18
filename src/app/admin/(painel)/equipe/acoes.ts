@@ -1,11 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { senhaProvisoria } from "@/lib/senha";
+import { convidarComLink } from "@/lib/links-senha";
 import { exigirAdmin, SEM_PERMISSAO } from "@/lib/sessao";
 import { criarClienteAdmin } from "@/lib/supabase/server";
 
-export type ResultadoEquipe = { ok?: boolean; erro?: string; senha?: string };
+export type ResultadoEquipe = {
+  ok?: boolean;
+  erro?: string;
+  /** false = o e-mail não saiu; `link` vem junto para repassar. */
+  emailEnviado?: boolean;
+  link?: string;
+};
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
 
@@ -38,12 +44,9 @@ export async function criarColaborador(
   if (nomeLimpo.length < 2) return { erro: "Informe o nome." };
   if (!EMAIL.test(limpo)) return { erro: "E-mail inválido." };
 
-  const senha = senhaProvisoria();
-
   const admin = criarClienteAdmin();
   const { data: criado, error } = await admin.auth.admin.createUser({
     email: limpo,
-    password: senha,
     email_confirm: true,
     user_metadata: { nome: nomeLimpo },
     app_metadata: { role: "colaborador" },
@@ -85,7 +88,10 @@ export async function criarColaborador(
   });
 
   revalidatePath("/admin/equipe");
-  return { ok: true, senha };
+  // Login nasce sem senha: o colaborador recebe o link para criar a dele.
+  const convite = await convidarComLink(limpo, "convite_equipe");
+  if ("erro" in convite) return { ok: true, emailEnviado: false };
+  return { ok: true, ...convite };
 }
 
 /** Desativar corta o acesso na hora (is_equipe() checa `ativo`), sem apagar. */

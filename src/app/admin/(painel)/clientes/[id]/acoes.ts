@@ -1,13 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { enviarLinkSenha } from "@/lib/email";
-import { gerarLinkSenha, linkSenhaLiberado } from "@/lib/links-senha";
-import { senhaProvisoria } from "@/lib/senha";
+import { convidarComLink, linkSenhaLiberado } from "@/lib/links-senha";
 import { exigirAdmin } from "@/lib/sessao";
 import { criarClienteAdmin } from "@/lib/supabase/server";
 
-export type Resultado = { ok?: boolean; erro?: string; senha?: string };
+export type Resultado = {
+  ok?: boolean;
+  erro?: string;
+  /** false = o e-mail não saiu; `link` vem junto para o Arthur repassar. */
+  emailEnviado?: boolean;
+  link?: string;
+};
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
 
@@ -100,14 +104,11 @@ export async function criarAcesso(
   if (!cliente) return { erro: "Cliente não encontrado." };
   if (cliente.user_id) return { erro: "Este cliente já tem login." };
 
-  // O cliente troca no primeiro acesso; o Arthur repassa por telefone ou
-  // WhatsApp.
-  const senha = senhaProvisoria();
-
+  // Login nasce SEM senha: o cliente recebe por e-mail o link para criar a
+  // dele (ninguém mais dita senha provisória por telefone).
   const admin = criarClienteAdmin();
   const { data: criado, error } = await admin.auth.admin.createUser({
     email: limpo,
-    password: senha,
     email_confirm: true,
     user_metadata: { nome: cliente.nome },
     // O papel vai no app_metadata: só a service_role escreve ali. O
@@ -144,7 +145,14 @@ export async function criarAcesso(
   });
 
   revalidar(clienteId);
-  return { ok: true, senha };
+
+  const convite = await convidarComLink(limpo, "acesso_liberado");
+  if ("erro" in convite) {
+    // O login existe e está vinculado; só o link falhou. O Arthur reenvia
+    // pelo botão da ficha.
+    return { ok: true, emailEnviado: false };
+  }
+  return { ok: true, ...convite };
 }
 
 export async function revogarAcesso(clienteId: number): Promise<Resultado> {
@@ -193,9 +201,7 @@ export async function reenviarSenha(email: string): Promise<Resultado> {
   if (!(await linkSenhaLiberado(email))) {
     return { erro: "Um link foi enviado há menos de 1 minuto. Aguarde um pouco." };
   }
-  const gerado = await gerarLinkSenha(email);
-  if (!gerado) return { erro: "Não encontramos login com este e-mail." };
-  const enviado = await enviarLinkSenha(email, gerado.nome, gerado.link, "redefinir");
-  if (!enviado) return { erro: "O e-mail não pôde ser enviado. Confira o SMTP." };
-  return { ok: true };
+  const convite = await convidarComLink(email, "redefinir");
+  if ("erro" in convite) return { erro: "Não encontramos login com este e-mail." };
+  return { ok: true, ...convite };
 }

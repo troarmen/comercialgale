@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { CONTATO } from "@/lib/contato";
 import { reais } from "@/lib/formato";
+import { criarClienteAdmin } from "@/lib/supabase/server";
 
 /**
  * E-mail transacional do catálogo (confirmação de pedido).
@@ -187,5 +188,104 @@ ${CONTATO.nome} · ${CONTATO.telefoneFixo} · WhatsApp ${CONTATO.whatsapp} · ${
   } catch (erro) {
     console.error(`[email] falha no link de senha (${motivo}):`, erro);
     return false;
+  }
+}
+
+// ------------------------------------------------------------------ cadastro
+
+/**
+ * Quem recebe os avisos da casa (Configurações → e-mails de notificação).
+ * A chave NÃO é pública — lida com a service_role, só no servidor.
+ */
+export async function emailsDaCasa() {
+  const { data } = await criarClienteAdmin()
+    .from("configuracoes")
+    .select("valor")
+    .eq("chave", "emails_notificacao")
+    .maybeSingle();
+  return Array.isArray(data?.valor)
+    ? (data.valor as unknown[]).filter(
+        (e): e is string => typeof e === "string" && e.includes("@"),
+      )
+    : [];
+}
+
+export type CadastroParaEmail = {
+  id: number;
+  nome: string;
+  nomeFantasia: string | null;
+  tipoPessoa: "fisica" | "juridica";
+  documento: string;
+  email: string;
+  telefone: string;
+  cidade: string | null;
+  uf: string | null;
+};
+
+function documentoFormatado(c: CadastroParaEmail) {
+  const d = c.documento;
+  return c.tipoPessoa === "juridica" && d.length === 14
+    ? `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
+    : d.length === 11
+      ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
+      : d;
+}
+
+/**
+ * Solicitação de cadastro: confirmação ao lojista + aviso à casa para aprovar.
+ * Falha de e-mail NÃO desfaz o cadastro — ele já está no painel.
+ */
+export async function enviarEmailsDeCadastro(cadastro: CadastroParaEmail) {
+  const t = transporte();
+  if (!t) {
+    console.warn(`[email] SMTP não configurado — cadastro ${cadastro.id} gravado sem e-mail.`);
+    return;
+  }
+  const remetente = process.env.EMAIL_REMETENTE ?? `Comercial Galé <${CONTATO.email}>`;
+  const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.comercialgale.com.br";
+  const rodape = `—
+${CONTATO.nome} · ${CONTATO.telefoneFixo} · WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}`;
+
+  const paraLojista = `Olá, ${cadastro.nomeFantasia || cadastro.nome}!
+
+Recebemos a sua solicitação de cadastro na ${CONTATO.nome}. Nossa equipe vai conferir os dados e, assim que o acesso for liberado, você recebe outro e-mail com o link para criar a sua senha. Com o login, os preços de atacado aparecem no site e você fecha pedidos por lá.
+
+Enquanto isso, o catálogo completo está aberto em ${site}.
+
+Quer agilizar? Chame a gente no WhatsApp ${CONTATO.whatsapp}.
+
+${rodape}`;
+
+  const paraCasa = `Novo cadastro pelo site, aguardando aprovação.
+
+${cadastro.nome}${cadastro.nomeFantasia ? ` (${cadastro.nomeFantasia})` : ""}
+${cadastro.tipoPessoa === "juridica" ? "CNPJ" : "CPF"}: ${documentoFormatado(cadastro)}
+E-mail: ${cadastro.email}
+Telefone: ${cadastro.telefone}
+${cadastro.cidade ? `Cidade: ${cadastro.cidade}${cadastro.uf ? `/${cadastro.uf}` : ""}\n` : ""}
+Para revisar e liberar o login:
+${site}/admin/clientes/${cadastro.id}`;
+
+  const envios = [
+    t.sendMail({
+      from: remetente,
+      to: cadastro.email,
+      subject: `Recebemos o seu cadastro — ${CONTATO.nome}`,
+      text: paraLojista,
+    }),
+    ...(await emailsDaCasa()).map((para) =>
+      t.sendMail({
+        from: remetente,
+        to: para,
+        // Responder o aviso cai direto no lojista.
+        replyTo: cadastro.email,
+        subject: `Novo cadastro para aprovar — ${cadastro.nomeFantasia || cadastro.nome}`,
+        text: paraCasa,
+      }),
+    ),
+  ];
+  const resultados = await Promise.allSettled(envios);
+  for (const r of resultados) {
+    if (r.status === "rejected") console.error(`[email] falha no cadastro ${cadastro.id}:`, r.reason);
   }
 }
