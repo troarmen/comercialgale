@@ -6,8 +6,9 @@ import { criarClienteServidor } from "@/lib/supabase/server";
  * Quem pode estar no painel, e com que poder.
  *
  *   admin       — tudo.
- *   colaborador — SÓ LÊ pedidos (migração 007). Não vê clientes, produtos,
- *                 cadastros nem configurações, e não muda nada.
+ *   colaborador — LÊ pedidos (007) e muda a situação deles (008). Não vê
+ *                 clientes, produtos, cadastros nem configurações, e não
+ *                 muda mais nada.
  *
  * Duas camadas, de propósito: o RLS é quem de fato protege o dado; as funções
  * abaixo dão mensagem clara e escondem o que a pessoa não pode usar.
@@ -52,6 +53,17 @@ export async function exigirAdmin() {
   const perfil = await perfilEquipe();
   if (perfil?.papel !== "admin") return null;
   return { supabase: perfil.supabase, user: perfil.user };
+}
+
+/**
+ * Guard das poucas actions que o colaborador também usa (hoje: mudar a
+ * situação do pedido). A escrita em si passa por função do banco que confere
+ * is_equipe() — o colaborador não tem UPDATE direto em tabela nenhuma.
+ */
+export async function exigirEquipe() {
+  const perfil = await perfilEquipe();
+  if (!perfil) return null;
+  return { supabase: perfil.supabase, user: perfil.user, papel: perfil.papel };
 }
 
 /**

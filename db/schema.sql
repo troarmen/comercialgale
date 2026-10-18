@@ -534,6 +534,40 @@ create policy "equipe le pedidos" on public.pedidos
 create policy "equipe le itens" on public.pedido_itens
   for select using (public.is_equipe());
 
+-- A única ESCRITA do colaborador: mudar a situação do pedido (migração 008).
+-- Função e não política de UPDATE: trava de coluna vale por papel do banco, e
+-- admin e colaborador são ambos `authenticated` — uma política deixaria o
+-- colaborador mudar total, desconto e anotações. Registra o log aqui dentro.
+create or replace function public.mudar_status_pedido(
+  p_id bigint,
+  p_status public.pedido_status
+)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_anterior public.pedido_status;
+begin
+  if not public.is_equipe() then
+    raise exception 'sem permissão para mudar o pedido' using errcode = '42501';
+  end if;
+
+  select status into v_anterior from public.pedidos where id = p_id for update;
+  if not found then
+    raise exception 'pedido não encontrado' using errcode = 'P0002';
+  end if;
+  if v_anterior = p_status then
+    return;
+  end if;
+
+  update public.pedidos set status = p_status where id = p_id;
+
+  insert into public.log_atividades (user_id, acao, entidade, entidade_id, detalhes)
+  values (auth.uid(), 'editou', 'pedido', p_id::text,
+          jsonb_build_object('campo', 'status', 'anterior', v_anterior, 'novo', p_status));
+end $$;
+
+revoke execute on function public.mudar_status_pedido(bigint, public.pedido_status) from public, anon;
+grant  execute on function public.mudar_status_pedido(bigint, public.pedido_status) to authenticated;
+
 
 -- =============================================================================
 -- 8. PREÇO — TRAVA DE COLUNA

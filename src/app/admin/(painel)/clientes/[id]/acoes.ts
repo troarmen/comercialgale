@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { senhaProvisoria } from "@/lib/senha";
 import { exigirAdmin } from "@/lib/sessao";
 import { criarClienteAdmin } from "@/lib/supabase/server";
 
@@ -97,11 +98,9 @@ export async function criarAcesso(
   if (!cliente) return { erro: "Cliente não encontrado." };
   if (cliente.user_id) return { erro: "Este cliente já tem login." };
 
-  // Senha provisória forte. O cliente troca no primeiro acesso; o Arthur
-  // repassa por telefone ou WhatsApp.
-  const senha = Array.from(crypto.getRandomValues(new Uint8Array(9)))
-    .map((n) => "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"[n % 55])
-    .join("");
+  // O cliente troca no primeiro acesso; o Arthur repassa por telefone ou
+  // WhatsApp.
+  const senha = senhaProvisoria();
 
   const admin = criarClienteAdmin();
   const { data: criado, error } = await admin.auth.admin.createUser({

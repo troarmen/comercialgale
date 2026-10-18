@@ -15,7 +15,8 @@ export default async function PaginaPedido({
 }) {
   const { id } = await params;
   // O layout do painel já barrou quem não é da equipe. Colaborador vê a
-  // ficha inteira, mas sem nenhum controle e sem links para seções de admin.
+  // ficha inteira e muda a situação, mas não edita anotações nem vínculo e
+  // não tem links para seções de admin.
   const perfil = await perfilEquipe();
   if (!perfil) notFound();
   const { supabase } = perfil;
@@ -78,11 +79,11 @@ export default async function PaginaPedido({
             Recebido em {dataHora(pedido.criado_em)}
           </p>
         </div>
-        {ehAdmin && (
-          <div className="w-56">
-            <TrocarStatus id={pedido.id} atual={pedido.status} />
-          </div>
-        )}
+        {/* Colaborador também muda a situação (migração 008) — é a única
+            escrita dele. */}
+        <div className="w-56">
+          <TrocarStatus id={pedido.id} atual={pedido.status} />
+        </div>
       </header>
 
       {ehAdmin && pedido.vinculo_revisar && <AvisoVinculo id={pedido.id} />}

@@ -751,6 +751,13 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_equipe: { Args: never; Returns: boolean }
       meu_cliente_id: { Args: never; Returns: number }
+      mudar_status_pedido: {
+        Args: {
+          p_id: number
+          p_status: Database["public"]["Enums"]["pedido_status"]
+        }
+        Returns: undefined
+      }
       pode_ver_precos: { Args: never; Returns: boolean }
     }
     Enums: {

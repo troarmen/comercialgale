@@ -38,6 +38,7 @@ export function MenuLateral({
     { href: "/admin/produtos", nome: "Produtos", icone: <I d="M10 2.5 17 6v8l-7 3.5L3 14V6l7-3.5ZM3 6l7 3.5L17 6M10 9.5v8" /> },
     { href: "/admin/clientes", nome: "Clientes", icone: <I d="M13 16v-1.5A2.5 2.5 0 0 0 10.5 12h-4A2.5 2.5 0 0 0 4 14.5V16M8.5 9.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM16 16v-1.5a2.5 2.5 0 0 0-1.9-2.4M12.5 4.6a2.5 2.5 0 0 1 0 4.8" /> },
     { href: "/admin/cadastros", nome: "Cadastros", icone: <I d="M4 6h12M4 10h12M4 14h7" /> },
+    { href: "/admin/equipe", nome: "Equipe", icone: <I d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM4 17v-.5A4.5 4.5 0 0 1 8.5 12h3a4.5 4.5 0 0 1 4.5 4.5v.5" /> },
     { href: "/admin/configuracoes", nome: "Configurações", icone: <I d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM16 10c0-.4 0-.8-.1-1.2l1.4-1-1.5-2.6-1.6.6a6 6 0 0 0-2-1.2L11.8 3H8.2l-.4 1.6a6 6 0 0 0-2 1.2l-1.6-.6L2.7 7.8l1.4 1a6 6 0 0 0 0 2.4l-1.4 1 1.5 2.6 1.6-.6a6 6 0 0 0 2 1.2l.4 1.6h3.6l.4-1.6a6 6 0 0 0 2-1.2l1.6.6 1.5-2.6-1.4-1c.1-.4.1-.8.1-1.2Z" /> },
   ];
   // Colaborador só consulta pedidos (migração 007). As outras seções também
