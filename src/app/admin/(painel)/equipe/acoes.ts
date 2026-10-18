@@ -40,9 +40,8 @@ export async function criarColaborador(
 
   const senha = senhaProvisoria();
 
-  // O papel vai no app_metadata — o gatilho handle_new_user lê dali e cria o
-  // profile já como colaborador. user_metadata o próprio usuário altera.
-  const { data: criado, error } = await criarClienteAdmin().auth.admin.createUser({
+  const admin = criarClienteAdmin();
+  const { data: criado, error } = await admin.auth.admin.createUser({
     email: limpo,
     password: senha,
     email_confirm: true,
@@ -57,6 +56,24 @@ export async function criarColaborador(
         ? "Já existe um login com este e-mail (pode ser de um cliente do catálogo). Use outro endereço."
         : (error?.message ?? "Não foi possível criar o login."),
     };
+  }
+
+  // O GoTrue INSERE o usuário e só depois grava o app_metadata (num UPDATE):
+  // quando o gatilho handle_new_user roda, o papel ainda não está lá e o
+  // profile nasce 'cliente' — o que é o certo para qualquer signup. Quem
+  // promove é o painel, aqui, com a service_role. O app_metadata acima fica
+  // como registro coerente do papel.
+  const { data: promovido } = await admin
+    .from("profiles")
+    .update({ role: "colaborador" })
+    .eq("id", criado.user.id)
+    .select("id")
+    .maybeSingle();
+
+  if (!promovido) {
+    // Não deixa login órfão com papel errado.
+    await admin.auth.admin.deleteUser(criado.user.id);
+    return { erro: "Não foi possível definir o papel do colaborador. Tente de novo." };
   }
 
   await sessao.supabase.from("log_atividades").insert({

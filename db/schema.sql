@@ -724,7 +724,10 @@ begin
     new.id,
     coalesce(new.raw_user_meta_data ->> 'nome', new.email),
     -- app_metadata, NUNCA user_metadata: este o próprio usuário escreve no
-    -- signUp e viraria admin (migração 005).
+    -- signUp e viraria admin (migração 005). Atenção: o GoTrue grava o
+    -- app_metadata num UPDATE logo DEPOIS do insert, então na prática todo
+    -- usuário nasce 'cliente' aqui. Quem promove a colaborador é o painel
+    -- (equipe/acoes.ts), com a service_role.
     coalesce((new.raw_app_meta_data ->> 'role')::app_role, 'cliente')
   );
   return new;
