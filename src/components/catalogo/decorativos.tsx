@@ -17,12 +17,14 @@ export function PadraoGrade() {
   );
 }
 
-/** Textura de pontos (malha de distribuição). */
-export function PadraoPontos() {
+/** Textura de pontos (malha de distribuição) — neutra ou no vermelho da marca. */
+export function PadraoPontos({ tom = "neutro" }: { tom?: "neutro" | "marca" }) {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 fundo-pontos mascara-suave opacity-70"
+      className={`pointer-events-none absolute inset-0 mascara-suave ${
+        tom === "marca" ? "fundo-pontos-marca opacity-80" : "fundo-pontos opacity-70"
+      }`}
     />
   );
 }

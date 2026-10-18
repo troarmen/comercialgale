@@ -241,6 +241,73 @@ body {
   background-size: 22px 22px;
 }
 
+/*
+ * Pontos pintados com o vermelho da marca — a mesma malha de distribuição,
+ * agora quente. Para a faixa institucional, onde o gelo pedia vida.
+ */
+.fundo-pontos-marca {
+  background-image: radial-gradient(
+    color-mix(in srgb, #e63946 18%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 22px 22px;
+}
+
+/*
+ * AURORA — a lavagem de vermelho que dá vida às faixas gelo e brancas sem
+ * nenhuma camada extra de DOM: dois halos radiais do vermelho da marca
+ * (gale-500 e gale-300), tão diluídos que lêem como calor, não como cor.
+ * Em CSS puro: custo zero, pinta no primeiro quadro, e é o que o visitante
+ * vê onde o fundo líquido não entra (celular, reduced-motion, sem WebGL).
+ * Os tons são literais de propósito: o Tailwind v4 só emite as variáveis
+ * do @theme que alguma utilidade usa, e aqui não há utilidade.
+ */
+.fundo-aurora {
+  background-image:
+    radial-gradient(55% 95% at 88% 12%, color-mix(in srgb, #e63946 13%, transparent), transparent 72%),
+    radial-gradient(42% 70% at 62% 104%, color-mix(in srgb, #f7a5ad 22%, transparent), transparent 70%);
+}
+.fundo-aurora-espelhada {
+  background-image:
+    radial-gradient(55% 95% at 10% 10%, color-mix(in srgb, #e63946 11%, transparent), transparent 72%),
+    radial-gradient(42% 70% at 70% 104%, color-mix(in srgb, #f7a5ad 20%, transparent), transparent 70%);
+}
+
+/*
+ * Halo no topo das páginas internas: nasce atrás do título e se dissolve no
+ * gelo antes da grade de produtos ou do formulário. Fica num pseudo-elemento
+ * do <main>, abaixo do conteúdo (z-index negativo dentro do contexto isolado),
+ * então nenhuma página precisa saber que ele existe. Na home o banner branco
+ * cobre o halo — ela tem a sua própria aurora.
+ */
+.halo-topo {
+  position: relative;
+  isolation: isolate;
+}
+.halo-topo::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 22rem;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    70% 100% at 50% 0%,
+    color-mix(in srgb, #e63946 9%, transparent),
+    transparent 70%
+  );
+}
+
+/*
+ * Máscara do fundo líquido no banner: esvazia o fluido atrás do bloco de
+ * texto (esquerda) e o concentra à direita, perto das fotos. É o que torna o
+ * efeito compatível com um h1 de 48px por cima.
+ */
+.liquido-mascara {
+  -webkit-mask-image: linear-gradient(90deg, transparent 34%, black 68%);
+  mask-image: linear-gradient(90deg, transparent 34%, black 68%);
+}
+
 /* esmaece o padrão nas bordas para ele não competir com o conteúdo */
 .mascara-suave {
   -webkit-mask-image: radial-gradient(ellipse 85% 90% at 50% 40%, black 45%, transparent 100%);

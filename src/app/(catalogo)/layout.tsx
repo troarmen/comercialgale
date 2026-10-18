@@ -43,7 +43,7 @@ export default function LayoutCatalogo({
       <JsonLd dados={[dadosOrganizacao(), dadosSite()]} />
       <div className="flex min-h-screen flex-col">
         <Cabecalho />
-        <main className="flex-1">{children}</main>
+        <main className="halo-topo flex-1">{children}</main>
         <Rodape />
       </div>
       <BotaoWhatsApp />

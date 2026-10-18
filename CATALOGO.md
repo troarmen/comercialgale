@@ -225,3 +225,26 @@ corrigir o extrator ou repetir o contorno usado aqui: o endpoint público
 - Cadastro público grava `incompleto`; duplicado é barrado com mensagem.
 - 301 dos três padrões legados; sitemap com 657 URLs; robots ok; build de
   produção limpo (`next build`), `tsc --noEmit` e `eslint --max-warnings 0`.
+
+## 11. Fundos com vermelho (18/10/2026) — onde cada camada entra
+
+Pedido: mais tons de vermelho e vida nas faixas gelo, sem empilhar camadas.
+A alocação passou por um julgamento por seção (Jev) e por decisão nossa:
+
+- **Hero da home**: ÚNICA instância do **fundo líquido** (`fundo-liquido.tsx`,
+  three.js, fluido pixelizado na rampa gelo → gale-500). Entra pelo porteiro
+  `fundo-liquido-lazy.tsx`: só com ponteiro fino e ≥ 1024px, sem
+  `prefers-reduced-motion`, sem `saveData`/pouca memória, depois do idle;
+  pausa fora da tela e com a aba oculta; `aria-hidden` e sem captura de
+  clique. A máscara `.liquido-mascara` esvazia o fluido atrás do texto.
+  Quem não passa no porteiro vê a `.fundo-aurora` em CSS — ninguém vê buraco.
+- **Como comprar**: `.fundo-aurora-espelhada` + `PadraoPontos tom="marca"`.
+- **Páginas internas**: `.halo-topo` no `<main>` (pseudo-elemento, z-index
+  negativo em contexto isolado) — halo de 22rem atrás do título.
+- **Não recebem nada**: prateleira, carrinho, rodapé, formulários — Jev e nós
+  concordamos: fundo em movimento atrás de preço, tabela ou campo atrapalha.
+
+Regras: **uma instância WebGL por página, no máximo**; vermelho de fundo
+sempre diluído (≤ 13% em CSS); nunca `object`/canvas acima de conteúdo
+clicável. Custo medido: chunk do three 532 KB / **131 KB gz**, carregado só
+no desktop e só depois do idle; nenhuma página além da home o referencia.

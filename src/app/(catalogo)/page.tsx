@@ -2,11 +2,8 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { CartaoProduto, GradeProdutos } from "@/components/catalogo/cartao-produto";
-import {
-  BrilhoMarca,
-  PadraoGrade,
-  PadraoPontos,
-} from "@/components/catalogo/decorativos";
+import { BrilhoMarca, PadraoPontos } from "@/components/catalogo/decorativos";
+import { FundoLiquidoLazy } from "@/components/catalogo/fundo-liquido-lazy";
 import {
   arvoreCategorias,
   configPublica,
@@ -150,9 +147,13 @@ export default async function PaginaInicial() {
   return (
     <>
       {/* ------------------------------------------------- banner principal */}
-      <section className="relative overflow-hidden border-b border-borda bg-superficie">
-        <PadraoGrade />
-        <BrilhoMarca />
+      {/*
+        Fundo em duas camadas que se substituem, não se somam: a aurora em CSS
+        pinta no primeiro quadro para todo mundo; o fluido pixelizado entra só
+        no desktop com ponteiro, depois do idle, mascarado para longe do texto.
+      */}
+      <section className="fundo-aurora relative overflow-hidden border-b border-borda bg-superficie">
+        <FundoLiquidoLazy className="liquido-mascara" />
 
         <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-10 lg:grid-cols-[1.1fr_1fr] lg:py-14">
           <div>
@@ -385,8 +386,8 @@ export default async function PaginaInicial() {
       )}
 
       {/* ---------------------------------------------------- como comprar */}
-      <section className="relative overflow-hidden border-y border-borda bg-superficie">
-        <PadraoPontos />
+      <section className="fundo-aurora-espelhada relative overflow-hidden border-y border-borda bg-superficie">
+        <PadraoPontos tom="marca" />
         <div className="relative mx-auto max-w-7xl px-4 py-12" aria-labelledby="titulo-como-funciona">
           <h2 id="titulo-como-funciona" className="text-2xl font-bold tracking-tight text-texto">
             Como comprar no atacado da Galé
