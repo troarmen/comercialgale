@@ -2,7 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Paginacao } from "@/components/paginacao";
 import { numero, reais } from "@/lib/formato";
-import { ORDEM_STATUS, STATUS, dataCurta, type StatusPedido } from "@/lib/pedidos";
+import {
+  ORDEM_STATUS,
+  STATUS,
+  clienteDoPedido,
+  dataCurta,
+  type StatusPedido,
+} from "@/lib/pedidos";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { BuscaPedidos } from "./busca";
 
@@ -24,7 +30,7 @@ export default async function PaginaPedidos({
   let consulta = supabase
     .from("pedidos")
     .select(
-      "id, numero, status, total_atacado, total_pecas, criado_em, vinculo_revisar, clientes(nome, cidade, uf)",
+      "id, numero, status, total_atacado, total_pecas, criado_em, vinculo_revisar, snapshot_cliente, clientes(id, nome, cidade, uf)",
       { count: "exact" },
     );
 
@@ -126,6 +132,7 @@ export default async function PaginaPedidos({
               <tbody>
                 {lista.map((p) => {
                   const s = STATUS[p.status];
+                  const c = clienteDoPedido(p.clientes, p.snapshot_cliente);
                   return (
                     <tr
                       key={p.id}
@@ -149,12 +156,12 @@ export default async function PaginaPedidos({
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="truncate text-texto">
-                          {p.clientes?.nome ?? "—"}
+                          {c?.nome ?? "—"}
                         </div>
-                        {p.clientes?.cidade && (
+                        {c?.cidade && (
                           <div className="text-xs text-suave">
-                            {p.clientes.cidade}
-                            {p.clientes.uf ? `/${p.clientes.uf}` : ""}
+                            {c.cidade}
+                            {c.uf ? `/${c.uf}` : ""}
                           </div>
                         )}
                       </td>

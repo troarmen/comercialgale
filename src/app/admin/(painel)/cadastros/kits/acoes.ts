@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { criarClienteServidor } from "@/lib/supabase/server";
+import { exigirAdmin, SEM_PERMISSAO } from "@/lib/sessao";
 
 export type EstadoKit = { ok?: boolean; erro?: string };
 
@@ -22,7 +22,9 @@ export async function salvarKit(
   }
   if (pecas > 999) return { erro: "Quantidade acima de 999 parece engano." };
 
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
 
   const { data: repetido } = await supabase
     .from("kits")
@@ -46,13 +48,16 @@ export async function salvarKit(
 }
 
 export async function alternarKit(id: number, ativo: boolean) {
-  const supabase = await criarClienteServidor();
-  await supabase.from("kits").update({ ativo }).eq("id", id);
+  const sessao = await exigirAdmin();
+  if (!sessao) return;
+  await sessao.supabase.from("kits").update({ ativo }).eq("id", id);
   revalidar();
 }
 
 export async function excluirKit(id: number): Promise<EstadoKit> {
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
 
   const { count } = await supabase
     .from("produtos")

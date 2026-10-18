@@ -29,15 +29,16 @@ export async function entrar(
     return { erro: "E-mail ou senha incorretos." };
   }
 
-  // Autenticar não basta — o painel é só para administradores. Um cliente do
-  // catálogo tem login válido e não pode entrar aqui.
+  // Autenticar não basta — o painel é só para a equipe (admin ou colaborador).
+  // Um cliente do catálogo tem login válido e não pode entrar aqui.
   const { data: perfil } = await supabase
     .from("profiles")
     .select("role, ativo")
     .eq("id", data.user.id)
     .single();
 
-  if (!perfil || perfil.role !== "admin" || !perfil.ativo) {
+  const daEquipe = perfil?.role === "admin" || perfil?.role === "colaborador";
+  if (!perfil || !daEquipe || !perfil.ativo) {
     await supabase.auth.signOut();
     return { erro: "Esta conta não tem acesso ao painel." };
   }

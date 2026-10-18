@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { numero, reais } from "@/lib/formato";
-import { STATUS, dataHora } from "@/lib/pedidos";
-import { criarClienteServidor } from "@/lib/supabase/server";
+import { STATUS, clienteDoPedido, dataHora } from "@/lib/pedidos";
+import { perfilEquipe } from "@/lib/sessao";
 import { AvisoVinculo, Observacao, TrocarStatus } from "./controles";
 
 export const metadata: Metadata = { title: "Pedido · Galé Comercial" };
@@ -14,7 +14,12 @@ export default async function PaginaPedido({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await criarClienteServidor();
+  // O layout do painel já barrou quem não é da equipe. Colaborador vê a
+  // ficha inteira, mas sem nenhum controle e sem links para seções de admin.
+  const perfil = await perfilEquipe();
+  if (!perfil) notFound();
+  const { supabase } = perfil;
+  const ehAdmin = perfil.papel === "admin";
 
   const { data: pedido } = await supabase
     .from("pedidos")
@@ -41,7 +46,8 @@ export default async function PaginaPedido({
     .order("produto_titulo")
     .order("tamanho");
 
-  const c = pedido.clientes;
+  // Colaborador não lê `clientes`: o join vem null e o snapshot assume.
+  const c = clienteDoPedido(pedido.clientes, pedido.snapshot_cliente);
   const s = STATUS[pedido.status];
   const linhas = itens ?? [];
 
@@ -72,12 +78,14 @@ export default async function PaginaPedido({
             Recebido em {dataHora(pedido.criado_em)}
           </p>
         </div>
-        <div className="w-56">
-          <TrocarStatus id={pedido.id} atual={pedido.status} />
-        </div>
+        {ehAdmin && (
+          <div className="w-56">
+            <TrocarStatus id={pedido.id} atual={pedido.status} />
+          </div>
+        )}
       </header>
 
-      {pedido.vinculo_revisar && <AvisoVinculo id={pedido.id} />}
+      {ehAdmin && pedido.vinculo_revisar && <AvisoVinculo id={pedido.id} />}
 
       <div className="grid gap-5 lg:grid-cols-[1fr_20rem]">
         <div className="min-w-0 space-y-5">
@@ -110,7 +118,7 @@ export default async function PaginaPedido({
                       className="border-b border-borda last:border-0"
                     >
                       <td className="px-4 py-2">
-                        {i.produto_id ? (
+                        {ehAdmin && i.produto_id ? (
                           <Link
                             href={`/admin/produtos/${i.produto_id}`}
                             className="text-texto hover:text-acento-texto"
@@ -174,12 +182,25 @@ export default async function PaginaPedido({
             </section>
           )}
 
-          <section className="rounded-xl border border-borda bg-superficie p-4">
-            <Observacao
-              id={pedido.id}
-              inicial={pedido.observacoes_admin ?? ""}
-            />
-          </section>
+          {ehAdmin ? (
+            <section className="rounded-xl border border-borda bg-superficie p-4">
+              <Observacao
+                id={pedido.id}
+                inicial={pedido.observacoes_admin ?? ""}
+              />
+            </section>
+          ) : (
+            pedido.observacoes_admin && (
+              <section className="rounded-xl border border-borda bg-superficie p-4">
+                <h2 className="text-sm font-semibold text-texto">
+                  Anotações internas
+                </h2>
+                <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-suave">
+                  {pedido.observacoes_admin}
+                </p>
+              </section>
+            )
+          )}
         </div>
 
         <aside className="space-y-5">
@@ -190,12 +211,16 @@ export default async function PaginaPedido({
                 <div>
                   <dt className="text-xs text-tenue">Nome</dt>
                   <dd className="text-texto">
-                    <Link
-                      href={`/admin/clientes/${c.id}`}
-                      className="hover:text-acento-texto"
-                    >
-                      {c.nome}
-                    </Link>
+                    {ehAdmin && c.id ? (
+                      <Link
+                        href={`/admin/clientes/${c.id}`}
+                        className="hover:text-acento-texto"
+                      >
+                        {c.nome}
+                      </Link>
+                    ) : (
+                      c.nome
+                    )}
                   </dd>
                   {c.nome_fantasia && (
                     <dd className="text-xs text-suave">{c.nome_fantasia}</dd>
@@ -246,15 +271,17 @@ export default async function PaginaPedido({
             )}
           </section>
 
-          <section className="rounded-xl border border-borda bg-superficie p-4">
-            <h2 className="mb-2 text-sm font-semibold text-texto">
-              Como cobrar
-            </h2>
-            <p className="text-sm leading-relaxed text-suave">
-              O pagamento não passa pelo site. Combine com o cliente pelo
-              contato acima e atualize a situação do pedido aqui.
-            </p>
-          </section>
+          {ehAdmin && (
+            <section className="rounded-xl border border-borda bg-superficie p-4">
+              <h2 className="mb-2 text-sm font-semibold text-texto">
+                Como cobrar
+              </h2>
+              <p className="text-sm leading-relaxed text-suave">
+                O pagamento não passa pelo site. Combine com o cliente pelo
+                contato acima e atualize a situação do pedido aqui.
+              </p>
+            </section>
+          )}
         </aside>
       </div>
     </div>

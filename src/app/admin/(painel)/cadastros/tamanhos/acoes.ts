@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { criarClienteServidor } from "@/lib/supabase/server";
+import { exigirAdmin, SEM_PERMISSAO } from "@/lib/sessao";
 import { TIPOS } from "@/lib/tamanhos";
 
 export type EstadoTamanho = { ok?: boolean; erro?: string };
@@ -23,7 +23,9 @@ export async function salvarTamanho(
   if (valor.length > 40) return { erro: "O valor passou de 40 caracteres." };
   if (!TIPOS.some((t) => t.valor === tipo)) return { erro: "Tipo inválido." };
 
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
 
   const { data: repetido } = await supabase
     .from("tamanhos")
@@ -45,8 +47,9 @@ export async function salvarTamanho(
 }
 
 export async function alternarTamanho(id: number, ativo: boolean) {
-  const supabase = await criarClienteServidor();
-  await supabase.from("tamanhos").update({ ativo }).eq("id", id);
+  const sessao = await exigirAdmin();
+  if (!sessao) return;
+  await sessao.supabase.from("tamanhos").update({ ativo }).eq("id", id);
   revalidar();
 }
 
@@ -58,7 +61,9 @@ export async function reclassificar(
   if (!ids.length) return { erro: "Nenhum tamanho selecionado." };
   if (!TIPOS.some((t) => t.valor === tipo)) return { erro: "Tipo inválido." };
 
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
   const { error } = await supabase
     .from("tamanhos")
     .update({ tipo })
@@ -70,7 +75,9 @@ export async function reclassificar(
 }
 
 export async function excluirTamanho(id: number): Promise<EstadoTamanho> {
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
 
   const { count } = await supabase
     .from("produto_tamanhos")

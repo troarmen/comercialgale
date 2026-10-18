@@ -1,4 +1,4 @@
-import type { Database } from "@/lib/supabase/tipos";
+import type { Database, Json } from "@/lib/supabase/tipos";
 
 export type StatusPedido = Database["public"]["Enums"]["pedido_status"];
 
@@ -79,4 +79,51 @@ export function dataHora(iso: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+const CAMPOS_CLIENTE = [
+  "nome", "nome_fantasia", "documento", "email", "telefone1", "telefone2",
+  "logradouro", "numero", "bairro", "cidade", "uf", "cep",
+] as const;
+
+export type ClienteDoPedido = {
+  /** id do cadastro — null quando os dados vêm só do snapshot. */
+  id: number | null;
+  tipo_pessoa: string | null;
+} & Record<(typeof CAMPOS_CLIENTE)[number], string | null>;
+
+/**
+ * Cliente de um pedido, para exibir no painel.
+ *
+ * Usa o cadastro (`clientes`) quando o RLS deixa ler — admin — e cai para o
+ * `snapshot_cliente` congelado no pedido quando não deixa: o colaborador não
+ * tem SELECT em `clientes` (migração 007), e o cadastro pode ter sido apagado.
+ * Pedidos do sistema antigo têm só o nome no snapshot; os novos têm tudo.
+ */
+export function clienteDoPedido(
+  cadastro: (Partial<Omit<ClienteDoPedido, "id">> & { id: number }) | null,
+  snapshot: Json,
+): ClienteDoPedido | null {
+  const s: { [chave: string]: Json | undefined } =
+    snapshot && typeof snapshot === "object" && !Array.isArray(snapshot)
+      ? snapshot
+      : {};
+  const texto = (v: Json | undefined) =>
+    typeof v === "string" && v.trim() ? v : null;
+
+  const base: Partial<ClienteDoPedido> = cadastro ?? {};
+  const cliente = { id: cadastro?.id ?? null } as ClienteDoPedido;
+  for (const campo of CAMPOS_CLIENTE) {
+    cliente[campo] = base[campo] ?? texto(s[campo]);
+  }
+  if (!cliente.nome) return null;
+
+  // O snapshot do catálogo não guarda o tipo de pessoa; o documento entrega
+  // (CNPJ tem 14 dígitos, CPF 11).
+  const digitos = cliente.documento?.replace(/\D/g, "").length ?? 0;
+  cliente.tipo_pessoa =
+    base.tipo_pessoa ??
+    texto(s.tipo_pessoa) ??
+    (digitos === 14 ? "juridica" : digitos === 11 ? "fisica" : null);
+  return cliente;
 }

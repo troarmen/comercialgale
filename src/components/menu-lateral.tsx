@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AlternarTema } from "@/components/alternar-tema";
 import { Marca } from "@/components/marca";
+import type { Papel } from "@/lib/sessao";
 
 type Item = {
   href: string;
@@ -21,15 +22,17 @@ const I = ({ d }: { d: string }) => (
 export function MenuLateral({
   pedidosNovos,
   nomeUsuario,
+  papel,
   aoSair,
 }: {
   pedidosNovos: number;
   nomeUsuario: string;
+  papel: Papel;
   aoSair: () => Promise<void>;
 }) {
   const caminho = usePathname();
 
-  const itens: Item[] = [
+  const todos: Item[] = [
     { href: "/admin", nome: "Painel", icone: <I d="M3 10.5 10 4l7 6.5M5 9.5V16h10V9.5" /> },
     { href: "/admin/pedidos", nome: "Pedidos", contador: pedidosNovos, icone: <I d="M5 3h10v14l-5-3-5 3V3ZM7.5 7h5M7.5 10h3" /> },
     { href: "/admin/produtos", nome: "Produtos", icone: <I d="M10 2.5 17 6v8l-7 3.5L3 14V6l7-3.5ZM3 6l7 3.5L17 6M10 9.5v8" /> },
@@ -37,6 +40,10 @@ export function MenuLateral({
     { href: "/admin/cadastros", nome: "Cadastros", icone: <I d="M4 6h12M4 10h12M4 14h7" /> },
     { href: "/admin/configuracoes", nome: "Configurações", icone: <I d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM16 10c0-.4 0-.8-.1-1.2l1.4-1-1.5-2.6-1.6.6a6 6 0 0 0-2-1.2L11.8 3H8.2l-.4 1.6a6 6 0 0 0-2 1.2l-1.6-.6L2.7 7.8l1.4 1a6 6 0 0 0 0 2.4l-1.4 1 1.5 2.6 1.6-.6a6 6 0 0 0 2 1.2l.4 1.6h3.6l.4-1.6a6 6 0 0 0 2-1.2l1.6.6 1.5-2.6-1.4-1c.1-.4.1-.8.1-1.2Z" /> },
   ];
+  // Colaborador só consulta pedidos (migração 007). As outras seções também
+  // o redirecionam no servidor — aqui é só para não mostrar porta fechada.
+  const itens =
+    papel === "admin" ? todos : todos.filter((i) => i.href === "/admin/pedidos");
 
   const ativo = (href: string) =>
     href === "/admin" ? caminho === "/admin" : caminho.startsWith(href);

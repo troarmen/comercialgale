@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { criarClienteServidor } from "@/lib/supabase/server";
+import { exigirAdmin, SEM_PERMISSAO } from "@/lib/sessao";
 import { paraSlug, slugLivre } from "@/lib/texto";
 
 export type EstadoCategoria = { ok?: boolean; erro?: string };
@@ -24,7 +24,9 @@ export async function salvarCategoria(
   if (nome.length < 2) return { erro: "O nome precisa ter ao menos 2 letras." };
   if (nome.length > 80) return { erro: "O nome passou de 80 caracteres." };
 
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
 
   const slug = await slugLivre(paraSlug(nome), async (candidato) => {
     const { data } = await supabase
@@ -46,8 +48,9 @@ export async function salvarCategoria(
 }
 
 export async function alternarCategoria(id: number, ativo: boolean) {
-  const supabase = await criarClienteServidor();
-  await supabase.from("categorias").update({ ativo }).eq("id", id);
+  const sessao = await exigirAdmin();
+  if (!sessao) return;
+  await sessao.supabase.from("categorias").update({ ativo }).eq("id", id);
   revalidar();
 }
 
@@ -59,7 +62,9 @@ export async function alternarCategoria(id: number, ativo: boolean) {
 export async function excluirCategoria(
   id: number,
 ): Promise<EstadoCategoria> {
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
 
   const [{ count: produtos }, { count: subs }] = await Promise.all([
     supabase.from("produtos").select("id", { count: "exact", head: true }).eq("categoria_id", id),

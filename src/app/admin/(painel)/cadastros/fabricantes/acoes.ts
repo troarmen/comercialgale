@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { criarClienteServidor } from "@/lib/supabase/server";
+import { exigirAdmin, SEM_PERMISSAO } from "@/lib/sessao";
 import { paraSlug, slugLivre } from "@/lib/texto";
 
 export type EstadoFabricante = { ok?: boolean; erro?: string };
@@ -20,7 +20,9 @@ export async function salvarFabricante(
   if (nome.length < 2) return { erro: "O nome precisa ter ao menos 2 letras." };
   if (nome.length > 120) return { erro: "O nome passou de 120 caracteres." };
 
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
 
   // O slug entra na URL do catálogo e é único. Se colidir, acrescenta um
   // número em vez de rejeitar o cadastro — o Arthur não deveria precisar
@@ -48,8 +50,9 @@ export async function salvarFabricante(
 }
 
 export async function alternarAtivo(id: number, ativo: boolean) {
-  const supabase = await criarClienteServidor();
-  await supabase.from("fabricantes").update({ ativo }).eq("id", id);
+  const sessao = await exigirAdmin();
+  if (!sessao) return;
+  await sessao.supabase.from("fabricantes").update({ ativo }).eq("id", id);
   revalidatePath(CAMINHO);
 }
 
@@ -61,7 +64,9 @@ export async function alternarAtivo(id: number, ativo: boolean) {
 export async function excluirFabricante(
   id: number,
 ): Promise<EstadoFabricante> {
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
 
   const { count } = await supabase
     .from("produtos")

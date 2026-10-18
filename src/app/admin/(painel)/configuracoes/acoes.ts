@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { criarClienteServidor } from "@/lib/supabase/server";
+import { exigirAdmin, SEM_PERMISSAO } from "@/lib/sessao";
 
 export type EstadoConfig = { ok?: boolean; erro?: string };
 
@@ -26,12 +26,11 @@ export async function salvarConfiguracoes(
   _anterior: EstadoConfig,
   form: FormData,
 ): Promise<EstadoConfig> {
-  const supabase = await criarClienteServidor();
-
-  // Confere que é admin antes de escrever. O RLS já barraria, mas uma mensagem
-  // clara é melhor do que um erro de permissão cru.
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { erro: "Sessão expirada. Entre novamente." };
+  // Confere que é admin antes de escrever. O RLS já barraria, mas em silêncio
+  // (UPDATE sem política afeta 0 linhas) — uma mensagem clara é melhor.
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
 
   const minimo = paraNumero(String(form.get("pedido_minimo_valor") ?? "0"));
   if (minimo === null || minimo < 0) {

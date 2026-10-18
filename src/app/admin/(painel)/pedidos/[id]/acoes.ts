@@ -2,10 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import type { StatusPedido } from "@/lib/pedidos";
-import { criarClienteServidor } from "@/lib/supabase/server";
+import { exigirAdmin, SEM_PERMISSAO } from "@/lib/sessao";
 
 export async function mudarStatus(id: number, status: StatusPedido) {
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase, user } = sessao;
   const { error } = await supabase
     .from("pedidos")
     .update({ status })
@@ -15,9 +17,8 @@ export async function mudarStatus(id: number, status: StatusPedido) {
 
   // Registra quem mudou o quê — o painel antigo não tinha isso, e é a primeira
   // pergunta que aparece quando um pedido "muda sozinho".
-  const { data: { user } } = await supabase.auth.getUser();
   await supabase.from("log_atividades").insert({
-    user_id: user?.id ?? null,
+    user_id: user.id,
     acao: "editou",
     entidade: "pedido",
     entidade_id: String(id),
@@ -31,7 +32,9 @@ export async function mudarStatus(id: number, status: StatusPedido) {
 }
 
 export async function salvarObservacao(id: number, texto: string) {
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
   const { error } = await supabase
     .from("pedidos")
     .update({ observacoes_admin: texto.trim() || null })
@@ -42,7 +45,9 @@ export async function salvarObservacao(id: number, texto: string) {
 }
 
 export async function confirmarVinculo(id: number) {
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
   const { error } = await supabase
     .from("pedidos")
     .update({ vinculo_revisar: false })

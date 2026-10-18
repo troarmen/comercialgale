@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { criarClienteAdmin, criarClienteServidor } from "@/lib/supabase/server";
+import { exigirAdmin } from "@/lib/sessao";
+import { criarClienteAdmin } from "@/lib/supabase/server";
 
 export type Resultado = { ok?: boolean; erro?: string; senha?: string };
 
@@ -10,20 +11,6 @@ const EMAIL = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
 function revalidar(id: number) {
   revalidatePath(`/admin/clientes/${id}`);
   revalidatePath("/admin/clientes");
-}
-
-/** Confirma que quem está chamando é administrador de verdade. */
-async function exigirAdmin() {
-  const supabase = await criarClienteServidor();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: perfil } = await supabase
-    .from("profiles")
-    .select("role, ativo")
-    .eq("id", user.id)
-    .single();
-  if (perfil?.role !== "admin" || !perfil.ativo) return null;
-  return { supabase, user };
 }
 
 export async function salvarCliente(
@@ -121,7 +108,10 @@ export async function criarAcesso(
     email: limpo,
     password: senha,
     email_confirm: true,
-    user_metadata: { nome: cliente.nome, role: "cliente" },
+    user_metadata: { nome: cliente.nome },
+    // O papel vai no app_metadata: só a service_role escreve ali. O
+    // user_metadata o próprio usuário altera (migração 005).
+    app_metadata: { role: "cliente" },
   });
 
   if (error || !criado.user) {

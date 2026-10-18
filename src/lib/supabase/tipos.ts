@@ -749,11 +749,12 @@ export type Database = {
     }
     Functions: {
       is_admin: { Args: never; Returns: boolean }
+      is_equipe: { Args: never; Returns: boolean }
       meu_cliente_id: { Args: never; Returns: number }
       pode_ver_precos: { Args: never; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "cliente"
+      app_role: "admin" | "cliente" | "colaborador"
       cliente_status: "inativo" | "ativo" | "incompleto"
       pedido_status:
         | "novo"
@@ -893,7 +894,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "cliente"],
+      app_role: ["admin", "cliente", "colaborador"],
       cliente_status: ["inativo", "ativo", "incompleto"],
       pedido_status: [
         "novo",

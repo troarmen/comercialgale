@@ -32,7 +32,8 @@
 -- 1. TIPOS
 -- =============================================================================
 
-create type app_role      as enum ('admin', 'cliente');
+-- colaborador: lê pedidos no painel, sem editar nada (migrações 006/007).
+create type app_role      as enum ('admin', 'cliente', 'colaborador');
 
 -- Espelha o status do painel antigo (0=Inativo, 1=Ativo, 2=Incompleto).
 -- 'incompleto' = cadastro que o cliente iniciou mas o Arthur ainda não liberou.
@@ -442,6 +443,16 @@ returns boolean language sql stable security definer set search_path = public as
   );
 $$;
 
+-- Admin ou colaborador. Só dá LEITURA de pedidos (políticas abaixo); escrita
+-- continua exigindo is_admin().
+create or replace function public.is_equipe()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role in ('admin', 'colaborador') and ativo
+  );
+$$;
+
 create or replace function public.meu_cliente_id()
 returns bigint language sql stable security definer set search_path = public as $$
   select id from public.clientes
@@ -514,6 +525,14 @@ create policy "cliente cria itens" on public.pedido_itens
   for insert with check (exists (
     select 1 from public.pedidos p
     where p.id = pedido_id and p.cliente_id = public.meu_cliente_id()));
+
+-- Colaborador (is_equipe) LÊ pedidos e itens — e nada mais. Sem SELECT em
+-- `clientes`: a ficha do pedido usa o snapshot_cliente congelado.
+create policy "equipe le pedidos" on public.pedidos
+  for select using (public.is_equipe());
+
+create policy "equipe le itens" on public.pedido_itens
+  for select using (public.is_equipe());
 
 
 -- =============================================================================
@@ -670,7 +689,9 @@ begin
   values (
     new.id,
     coalesce(new.raw_user_meta_data ->> 'nome', new.email),
-    coalesce((new.raw_user_meta_data ->> 'role')::app_role, 'cliente')
+    -- app_metadata, NUNCA user_metadata: este o próprio usuário escreve no
+    -- signUp e viraria admin (migração 005).
+    coalesce((new.raw_app_meta_data ->> 'role')::app_role, 'cliente')
   );
   return new;
 end $$;

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { numero, reais } from "@/lib/formato";
 import { STATUS, dataCurta, type StatusPedido } from "@/lib/pedidos";
-import { criarClienteServidor } from "@/lib/supabase/server";
+import { exigirAdminPagina } from "@/lib/sessao";
 
 export const metadata: Metadata = { title: "Painel · Galé Comercial" };
 
@@ -60,7 +60,8 @@ function Cartao({
 }
 
 export default async function Painel() {
-  const supabase = await criarClienteServidor();
+  // Números de clientes e produtos: só admin. Colaborador cai em Pedidos.
+  const { supabase } = await exigirAdminPagina();
 
   const agora = new Date();
   const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);

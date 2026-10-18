@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { criarClienteServidor } from "@/lib/supabase/server";
+import { exigirAdmin, SEM_PERMISSAO } from "@/lib/sessao";
 import type { Resultado } from "../[id]/acoes";
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
@@ -11,9 +11,9 @@ export async function criarCliente(
   _anterior: Resultado,
   form: FormData,
 ): Promise<Resultado> {
-  const supabase = await criarClienteServidor();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { erro: "Sessão expirada. Entre novamente." };
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase, user } = sessao;
 
   const nome = String(form.get("nome") ?? "").trim();
   if (nome.length < 2) return { erro: "O nome é obrigatório." };

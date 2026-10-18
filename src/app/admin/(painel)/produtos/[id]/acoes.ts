@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { criarClienteAdmin, criarClienteServidor } from "@/lib/supabase/server";
+import { exigirAdmin, SEM_PERMISSAO } from "@/lib/sessao";
+import { criarClienteAdmin } from "@/lib/supabase/server";
 import { paraSlug, slugLivre } from "@/lib/texto";
 
 export type EstadoProduto = { ok?: boolean; erro?: string };
@@ -33,9 +34,9 @@ export async function salvarProduto(
   _anterior: EstadoProduto,
   form: FormData,
 ): Promise<EstadoProduto> {
-  const supabase = await criarClienteServidor();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { erro: "Sessão expirada. Entre novamente." };
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase, user } = sessao;
 
   const id = form.get("id") ? Number(form.get("id")) : null;
   const titulo = String(form.get("titulo") ?? "").trim();
@@ -202,9 +203,9 @@ function traduzir(mensagem: string) {
 // --------------------------------------------------------------------- fotos
 
 export async function subirFoto(form: FormData): Promise<EstadoProduto> {
-  const supabase = await criarClienteServidor();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { erro: "Sessão expirada." };
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
 
   const produtoId = Number(form.get("produto_id"));
   const arquivo = form.get("arquivo");
@@ -262,7 +263,9 @@ export async function excluirFoto(
   imagemId: number,
   produtoId: number,
 ): Promise<EstadoProduto> {
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
 
   const { data: img } = await supabase
     .from("produto_imagens")
@@ -304,7 +307,9 @@ export async function definirPrincipal(
   imagemId: number,
   produtoId: number,
 ): Promise<EstadoProduto> {
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
   // O índice único exige zerar antes de marcar a nova.
   await supabase
     .from("produto_imagens")
@@ -323,7 +328,9 @@ export async function reordenarFotos(
   produtoId: number,
   idsNaOrdem: number[],
 ): Promise<EstadoProduto> {
-  const supabase = await criarClienteServidor();
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase } = sessao;
   for (let i = 0; i < idsNaOrdem.length; i++) {
     await supabase
       .from("produto_imagens")
@@ -335,9 +342,9 @@ export async function reordenarFotos(
 }
 
 export async function excluirProduto(id: number): Promise<EstadoProduto> {
-  const supabase = await criarClienteServidor();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { erro: "Sessão expirada. Entre novamente." };
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const { supabase, user } = sessao;
 
   const { count } = await supabase
     .from("pedido_itens")

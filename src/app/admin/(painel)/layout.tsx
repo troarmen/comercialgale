@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { MenuLateral } from "@/components/menu-lateral";
+import { perfilEquipe } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { sair } from "../login/acoes";
 
@@ -8,27 +9,19 @@ export default async function LayoutPainel({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await criarClienteServidor();
+  // O proxy garante só que existe sessão. Aqui verificamos se a pessoa é da
+  // equipe (admin ou colaborador) — um cliente do catálogo tem login válido e
+  // não pode ver estas telas. O que cada papel vê dentro do painel é decidido
+  // nas seções (exigirAdminPagina) e, em última instância, pelo RLS.
+  const perfil = await perfilEquipe();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/admin/login");
-
-  // O middleware garante só que existe sessão. Aqui verificamos se a pessoa é
-  // de fato administradora — um cliente do catálogo tem login válido e não
-  // pode ver estas telas.
-  const { data: perfil } = await supabase
-    .from("profiles")
-    .select("nome, role, ativo")
-    .eq("id", user.id)
-    .single();
-
-  if (!perfil || perfil.role !== "admin" || !perfil.ativo) {
+  if (!perfil) {
+    const supabase = await criarClienteServidor();
     await supabase.auth.signOut();
     redirect("/admin/login");
   }
 
+  const { supabase, user } = perfil;
   const { count: pedidosNovos } = await supabase
     .from("pedidos")
     .select("id", { count: "exact", head: true })
@@ -39,6 +32,7 @@ export default async function LayoutPainel({
       <MenuLateral
         pedidosNovos={pedidosNovos ?? 0}
         nomeUsuario={perfil.nome ?? user.email ?? "Admin"}
+        papel={perfil.papel}
         aoSair={sair}
       />
       <main className="min-w-0 flex-1 bg-fundo">{children}</main>
