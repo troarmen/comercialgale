@@ -84,7 +84,8 @@ próprio para `/definir-senha?token_hash=…`. Três decisões não óbvias:
 `/esqueci-senha` responde igual com ou sem conta (não revela quem é cliente).
 
 Variáveis: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`/`SMTP_SENHA`,
-`EMAIL_REMETENTE`, `NEXT_PUBLIC_SITE_URL` (monta os links). Produção:
+`EMAIL_REMETENTE` e `URL_LINKS_EMAIL` (base dos links; cai no
+`NEXT_PUBLIC_SITE_URL` se ausente — ver DEPLOY.md §2). Produção:
 **Brevo** — passo a passo em [DEPLOY.md](DEPLOY.md). Em desenvolvimento, o
 Supabase local expõe um Mailpit (SMTP `127.0.0.1:54325`, UI `:54324`).
 

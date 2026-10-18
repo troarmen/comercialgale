@@ -1,4 +1,4 @@
-import { enviarLinkSenha, type MotivoLinkSenha } from "@/lib/email";
+import { enviarLinkSenha, urlDosLinks, type MotivoLinkSenha } from "@/lib/email";
 import { criarClienteAdmin } from "@/lib/supabase/server";
 
 /**
@@ -28,8 +28,7 @@ export async function gerarLinkSenha(email: string) {
   });
   if (error || !data.properties?.hashed_token) return null;
 
-  const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.comercialgale.com.br";
-  const url = new URL("/definir-senha", site);
+  const url = new URL("/definir-senha", urlDosLinks());
   url.searchParams.set("token_hash", data.properties.hashed_token);
   url.searchParams.set("type", "recovery");
   return { link: url.toString(), nome: (data.user.user_metadata?.nome as string | undefined) ?? null };

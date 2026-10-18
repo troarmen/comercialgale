@@ -16,15 +16,17 @@ vários domínios.
 1. Brevo → **Configurações → Remetentes, domínios e IPs → Domínios →
    Adicionar domínio** → `comercialgale.com.br`.
 2. O Brevo mostra os registros DNS (código de verificação `brevo-code`,
-   **DKIM** e **DMARC**). Publique **exatamente** o que ele mostrar, onde o DNS
-   do domínio é administrado (Registro.br, Cloudflare ou a hospedagem).
-3. **Cuidado com o SPF.** O domínio já recebe e-mail (`contato@`), então já
-   deve existir um registro TXT começando com `v=spf1`. Se o Brevo pedir
-   SPF, **acrescente o `include:` dele no registro existente** — domínio com
-   DOIS registros `v=spf1` falha o SPF inteiro. Fica assim, por exemplo:
-   `v=spf1 include:(o que já existe) include:spf.brevo.com ~all`
-4. **DMARC**: se o domínio ainda não tem `_dmarc`, comece com `p=none`
-   (só monitora). Endurecer para `quarantine` depois de semanas sem falha.
+   **DKIM** e **DMARC**). Publique **exatamente** o que ele mostrar no painel
+   de DNS da **KingHost** — é lá que o domínio está
+   (`dns1/dns2.kinghost.com.br`, conferido em 18/10/2026). A caixa
+   `contato@` é da **Locaweb** (MX) e não muda nada.
+3. **Cuidado com o SPF.** Já existe `v=spf1 include:_spf.locaweb.com.br -all`.
+   **Edite esse registro** — não crie outro: domínio com DOIS `v=spf1` falha o
+   SPF inteiro. Fica:
+   `v=spf1 include:_spf.locaweb.com.br include:spf.brevo.com -all`
+4. **DMARC**: já existe `_dmarc` com `v=DMARC1; p=none;`. Se o Brevo sugerir
+   outro valor de DMARC, **edite o existente** em vez de criar um segundo.
+   Endurecer para `quarantine` só depois de semanas sem falha.
 5. Volte ao Brevo e clique em **Autenticar**. Pode levar de minutos a algumas
    horas. Só siga quando o domínio aparecer como autenticado.
 6. **Remetentes** → confirme que `contato@comercialgale.com.br` está lá e
@@ -37,19 +39,31 @@ vários domínios.
 > o outro cliente. A Galé usa algumas dezenas num dia muito bom; se o outro
 > cliente crescer, é o Brevo que avisa.
 
-## 2. Variáveis de ambiente na hospedagem (produção)
+## 2. Variáveis de ambiente na Vercel (produção)
+
+O site novo roda em **https://comercialgale.vercel.app** (o `www` ainda é o
+site antigo, na KingHost). Vercel → projeto **comercialgale** → **Settings →
+Environment Variables** → ambiente **Production**:
 
 | Variável | Valor |
 |---|---|
 | `SMTP_HOST` | servidor do passo 1.7 (`smtp-relay.brevo.com`) |
 | `SMTP_PORT` | `587` |
 | `SMTP_USER` | login do passo 1.7 |
-| `SMTP_SENHA` | chave SMTP do passo 1.7 |
+| `SMTP_SENHA` | chave SMTP do passo 1.7 — marque como **Sensitive** |
 | `EMAIL_REMETENTE` | `Comercial Galé <contato@comercialgale.com.br>` |
-| `NEXT_PUBLIC_SITE_URL` | `https://www.comercialgale.com.br` — monta os links dos e-mails; errado aqui = link quebrado |
+| `URL_LINKS_EMAIL` | `https://comercialgale.vercel.app` |
 
-As do Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-`SUPABASE_SERVICE_ROLE_KEY`) já existem — não mudam.
+**Não mexa no `NEXT_PUBLIC_SITE_URL`** — ele é o canônico do SEO e já está
+(certo) como `https://www.comercialgale.com.br`. O `URL_LINKS_EMAIL` existe
+justamente porque, até a virada, o `www` abre o site ANTIGO: sem ele, todo
+link de "criar senha" e "aprovar cadastro" cairia lá.
+
+Variável nova só vale a partir do próximo deploy — faça este passo **antes**
+do push do passo 4.
+
+> **No dia da virada do domínio** (`www` → Vercel): apague o
+> `URL_LINKS_EMAIL` e faça um redeploy. Os links passam a usar o `www`.
 
 ## 3. Migração 009 no Supabase de produção
 

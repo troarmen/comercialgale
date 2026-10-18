@@ -18,6 +18,22 @@ import { criarClienteAdmin } from "@/lib/supabase/server";
  * painel continua mostrando o pedido e o Arthur liga do mesmo jeito.
  */
 
+/**
+ * Endereço que os LINKS dos e-mails usam (criar senha, ficha no painel).
+ *
+ * Separado do NEXT_PUBLIC_SITE_URL de propósito: aquele é o canônico do SEO e
+ * já aponta para www.comercialgale.com.br — que, até a virada do domínio,
+ * ainda é o SITE ANTIGO. Enquanto o site novo roda só na Vercel, defina
+ * URL_LINKS_EMAIL=https://comercialgale.vercel.app; na virada, apague-a.
+ */
+export function urlDosLinks() {
+  return (
+    process.env.URL_LINKS_EMAIL ??
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    "https://www.comercialgale.com.br"
+  ).replace(/\/+$/, "");
+}
+
 function transporte() {
   const host = process.env.SMTP_HOST;
   if (!host) return null;
@@ -172,7 +188,7 @@ ${abertura}
 
 ${link}
 
-O link vale por 1 hora e funciona uma vez só. Se expirar, peça outro em ${process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.comercialgale.com.br"}/esqueci-senha.
+O link vale por 1 hora e funciona uma vez só. Se expirar, peça outro em ${urlDosLinks()}/esqueci-senha.
 ${motivo === "redefinir" ? "\nNão pediu? Pode ignorar este e-mail — a sua senha continua a mesma.\n" : ""}
 —
 ${CONTATO.nome} · ${CONTATO.telefoneFixo} · WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}`;
@@ -242,7 +258,7 @@ export async function enviarEmailsDeCadastro(cadastro: CadastroParaEmail) {
     return;
   }
   const remetente = process.env.EMAIL_REMETENTE ?? `Comercial Galé <${CONTATO.email}>`;
-  const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.comercialgale.com.br";
+  const site = urlDosLinks();
   const rodape = `—
 ${CONTATO.nome} · ${CONTATO.telefoneFixo} · WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}`;
 
