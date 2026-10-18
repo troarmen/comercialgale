@@ -69,7 +69,7 @@ export async function generateMetadata(
       title: `${sub.nome} — ${categoria.nome} no Atacado`,
       description:
         sub.descricao ??
-        `${sub.nome} no atacado para lojistas: linha ${categoria.nome.toLowerCase()} da Comercial Galé, em kits fechados com preço de revenda sugerido. Desde 1976 em São Paulo.`,
+        `${sub.nome} no atacado para lojistas: linha ${categoria.nome.toLowerCase()} da Comercial Galé, em embalagens fechadas, com preço de Atacado e de Varejo. Desde 1976 em São Paulo.`,
       ...(filtrado ? { robots: { index: false, follow: true } } : {}),
       alternates: { canonical: pagina > 1 ? `${base}?pagina=${pagina}` : base },
     };
@@ -83,7 +83,7 @@ export async function generateMetadata(
     title: `${categoria.nome} no Atacado para Revenda`,
     description:
       categoria.descricao ??
-      `${categoria.nome} no atacado para a sua loja${linhas ? `: ${linhas} e mais` : ""}. Kits fechados, preço de revenda sugerido e atendimento direto da 25 de Março, em São Paulo.`,
+      `${categoria.nome} no atacado para a sua loja${linhas ? `: ${linhas} e mais` : ""}. Embalagens fechadas, preço de Atacado e de Varejo e atendimento direto da 25 de Março, em São Paulo.`,
     ...(filtrado ? { robots: { index: false, follow: true } } : {}),
     alternates: { canonical: pagina > 1 ? `${base}?pagina=${pagina}` : base },
   };
@@ -166,7 +166,7 @@ export default async function PaginaCategoria(
           </p>
         ) : (
           <p className="mt-1 max-w-2xl text-sm text-suave">
-            Kits fechados com preço de atacado e revenda sugerida para lojistas.
+            Embalagens fechadas com preço de Atacado e de Varejo para lojistas.
           </p>
         )}
         <ChipsSubcategorias categoria={categoria} ativa={subcategoria?.slug} />

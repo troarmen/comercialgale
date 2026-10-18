@@ -24,7 +24,7 @@ export default async function PaginaCadastro() {
           O catálogo é aberto; o preço de atacado é para lojistas cadastrados.
           Preencha os dados, aguarde a liberação e compre online
           {config.pedidoMinimo > 0 &&
-            ` — pedido mínimo de ${reais(config.pedidoMinimo)}`}
+            ` — compras no atacado a partir de ${reais(config.pedidoMinimo)}`}
           . Já tem login?{" "}
           <Link href="/entrar" className="font-semibold text-acento-texto">
             Entre por aqui

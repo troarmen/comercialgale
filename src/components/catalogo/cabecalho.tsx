@@ -7,7 +7,7 @@ import { CarrinhoBotao } from "./carrinho-botao";
 import { MenuMovel, NavDesktop } from "./nav-principal";
 
 /**
- * Logotipo oficial da Galé (coração + "Super Atacado · 48 anos de tradição").
+ * Logotipo oficial da Galé — edição 50 anos (coração + faixa "50 ANOS · 2026").
  * O arquivo tem texto carvão sobre fundo transparente; no tema escuro a
  * `--logo-placa` pinta uma placa branca atrás para ele continuar legível.
  */
@@ -20,11 +20,11 @@ export function MarcaCatalogo({ compacta = false }: { compacta?: boolean }) {
     >
       <Image
         src="/logo-gale.png"
-        alt="Comercial Galé — Super Atacado, mais de 48 anos de tradição"
-        width={187}
-        height={143}
+        alt="Galé Super Atacado — 50 anos de tradição"
+        width={460}
+        height={426}
         priority
-        className={compacta ? "h-10 w-auto" : "h-12 w-auto sm:h-14"}
+        className={compacta ? "h-12 w-auto" : "h-14 w-auto sm:h-16"}
       />
     </Link>
   );

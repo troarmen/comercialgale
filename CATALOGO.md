@@ -132,6 +132,43 @@ Clientes, onde o Arthur aprova e cria o login — fluxo que o painel já tem.
   quadrada ganha faixas brancas que somem no fundo branco do estúdio. O zoom
   do hover caiu para 1,02 para não encostar na borda.
 
+### Rodada de feedbacks do cliente (17/10/2026) — escopo frontend
+
+- **Mínimo de R$ 500 virou AVISO**: o bloqueio saiu do `fecharPedido` e do
+  botão. O carrinho mostra a faixa âmbar "compras no atacado são a partir de
+  R$ 500" quando o total está abaixo, mas o pedido FECHA (verificado de ponta
+  a ponta: pedido local nº 2026100001001, R$ 93). `pedido_minimo_valor` segue
+  sendo o valor de referência do aviso.
+- **Nomenclatura oficial: "Atacado" e "Varejo"** — "revenda sugerida"/"preço
+  sugerido" foram extintos da UI. O Varejo aparece ao lado do Atacado no
+  cartão, na grade da ficha e no carrinho, sempre atrás de
+  `exibir_preco_varejo`.
+- **"Embalagem com X peça(s)"** substituiu "kit" em TODA copy visível
+  (ficha, grade, cartões, carrinho, e-mail, aria-labels). Os identificadores
+  internos (`qtdKits`, `pecas_no_kit`…) não mudam — são o vocabulário do
+  banco (PAINEL.md §2).
+- **Carrinho em TABELA, sem foto** (pedido do cliente): colunas Produto/Ref/
+  Marca, Tam., Emb. c/, Qtd, Atacado+Total, Varejo+Total, remover; totais no
+  rodapé; rolagem horizontal no celular. Visitante vê a tabela sem colunas de
+  preço. O item do carrinho ganhou campo opcional `marca`.
+- **Validade do carrinho**: localStorage com carimbo `salvoEm`; expira só após
+  90 dias sem mexer (formato antigo, array puro, continua sendo lido). Não há
+  mais perda por "sessão" — a nota na tabela explica isso ao lojista.
+- **Logo 50 anos** (`public/logo-gale.png`, 919×851 com transparência; fundo
+  #f7f7f7 removido por floodfill) no cabeçalho/rodapé/gaveta; favicon e
+  coração regenerados da arte nova.
+- **Home reorganizada** (padrão e-commerce dos concorrentes indicados):
+  banner enxuto (fotos fixas `HERO_SLUGS` do painel preservadas, com
+  fallback) → mini banners → prateleira de produtos na primeira dobra →
+  categorias → marcas → como comprar → história. A prateleira usa lançamentos
+  QUANDO existem e cai para destaques — em produção `lancamento=false` em
+  todo o catálogo (migração não trouxe a flag; ver nota no código).
+
+**Fora desta rodada (backend, próxima)**: e-mails de confirmação não chegam
+(SMTP de produção nunca configurado + SPF/DKIM — §4 deste doc); login
+restrito para colaboradores verem pedidos sem editar (novo papel no painel +
+políticas RLS — decisão de modelagem com o painel).
+
 ### Demais decisões
 
 - **Grade de compra B2B**: na ficha, cada tamanho tem contador de kits e um

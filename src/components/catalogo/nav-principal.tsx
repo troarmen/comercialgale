@@ -151,9 +151,9 @@ export function MenuMovel({ categorias }: { categorias: CategoriaMenu[] }) {
                 <Image
                   src="/logo-gale.png"
                   alt="Comercial Galé"
-                  width={187}
-                  height={143}
-                  className="h-10 w-auto"
+                  width={460}
+                  height={426}
+                  className="h-12 w-auto"
                 />
               </span>
               <button

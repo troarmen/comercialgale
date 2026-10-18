@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import {
+  configPublica,
   listarProdutos,
   marcasComContagem,
   precosPorProduto,
@@ -32,10 +33,8 @@ export async function Vitrine({
   /** a página de marca já É o filtro de marca — não ofereça de novo */
   semFiltroDeMarca?: boolean;
 }) {
-  const [{ produtos, total, pagina, paginas }, marcas] = await Promise.all([
-    listarProdutos(filtros),
-    marcasComContagem(),
-  ]);
+  const [{ produtos, total, pagina, paginas }, marcas, config] =
+    await Promise.all([listarProdutos(filtros), marcasComContagem(), configPublica()]);
   const precos = await precosPorProduto(produtos.map((p) => p.id));
 
   // Só oferece as marcas que existem no recorte atual? A contagem por recorte
@@ -96,6 +95,7 @@ export async function Vitrine({
                 produto={p}
                 faixa={precos.get(p.id)}
                 prioridade={pagina === 1 && i < 4}
+                exibirVarejo={config.exibirVarejo}
               />
             ))}
           </GradeProdutos>

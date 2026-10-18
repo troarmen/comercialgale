@@ -161,13 +161,12 @@ export async function fecharPedido(
     0,
   );
 
-  const config = await configPublica();
-  if (config.pedidoMinimo > 0 && totalAtacado < config.pedidoMinimo) {
-    return {
-      ok: false,
-      erro: `O pedido mínimo é de R$ ${config.pedidoMinimo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}. Complete o carrinho para fechar.`,
-    };
-  }
+  /*
+   * O valor de referência do atacado (configuracoes.pedido_minimo_valor) NÃO
+   * bloqueia mais o fechamento — decisão do cliente (out/2026): o site avisa
+   * que o atacado começa em R$ 500, mas pedido menor fecha normalmente e a
+   * negociação segue no contato. O aviso mora na tela do carrinho.
+   */
 
   /*
    * A gravação usa o cliente admin: `pedidos` não tem política de SELECT para

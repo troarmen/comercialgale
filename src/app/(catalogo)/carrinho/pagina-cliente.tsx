@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
@@ -10,7 +9,7 @@ import {
   removerDoCarrinho,
   useCarrinho,
 } from "@/components/catalogo/carrinho";
-import { reais, urlFoto } from "@/lib/formato";
+import { reais } from "@/lib/formato";
 import {
   consultarCarrinho,
   fecharPedido,
@@ -19,6 +18,12 @@ import {
 
 type Situacao = Awaited<ReturnType<typeof consultarCarrinho>>;
 
+/**
+ * O pedido é mostrado como TABELA, sem foto — pedido de atacado se confere
+ * linha a linha, como a planilha do balcão (feedback do cliente, out/2026).
+ * Atacado e Varejo aparecem lado a lado, e o valor de referência de R$ 500
+ * virou AVISO: não bloqueia mais o fechamento.
+ */
 export function PaginaCarrinhoCliente() {
   const { itens, pronto } = useCarrinho();
   const [situacao, setSituacao] = useState<Situacao | null>(null);
@@ -82,7 +87,7 @@ export function PaginaCarrinhoCliente() {
     return (
       <div aria-hidden="true" className="space-y-3">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-24 animate-pulse rounded-2xl border border-borda bg-superficie" />
+          <div key={i} className="h-16 animate-pulse rounded-2xl border border-borda bg-superficie" />
         ))}
       </div>
     );
@@ -120,14 +125,25 @@ export function PaginaCarrinhoCliente() {
   const precoDe = (chave: string) => situacao?.precos?.[chave];
   const indisponiveis = new Set(situacao?.indisponiveis ?? []);
   const podeVerPrecos = !!situacao?.clienteAtivo;
+  const exibirVarejoConfig = podeVerPrecos && situacao?.exibirVarejo !== false;
 
   const totalAtacado = itens.reduce((s, i) => {
     const p = precoDe(chaveItem(i));
     return s + (p ? p.precoKitAtacado * i.qtdKits : 0);
   }, 0);
+  const totalVarejo = itens.reduce((s, i) => {
+    const p = precoDe(chaveItem(i));
+    return s + (p ? p.precoKitVarejo * i.qtdKits : 0);
+  }, 0);
+  // nenhum item com varejo cadastrado? a dupla de colunas não aparece
+  const exibirVarejo =
+    exibirVarejoConfig &&
+    itens.some((i) => (precoDe(chaveItem(i))?.precoKitVarejo ?? 0) > 0);
   const totalPecas = itens.reduce((s, i) => s + i.pecasNoKit * i.qtdKits, 0);
-  const totalKits = itens.reduce((s, i) => s + i.qtdKits, 0);
-  const faltaParaMinimo = (situacao?.pedidoMinimo ?? 0) - totalAtacado;
+  const totalEmbalagens = itens.reduce((s, i) => s + i.qtdKits, 0);
+  const pedidoMinimo = situacao?.pedidoMinimo ?? 0;
+  const abaixoDoMinimo =
+    podeVerPrecos && pedidoMinimo > 0 && totalAtacado > 0 && totalAtacado < pedidoMinimo;
   const temIndisponivel = itens.some((i) => indisponiveis.has(chaveItem(i)));
 
   function confirmar() {
@@ -147,110 +163,160 @@ export function PaginaCarrinhoCliente() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-      {/* ------------------------------------------------------------ itens */}
-      <ul className="space-y-3">
-        {itens.map((item) => {
-          const chave = chaveItem(item);
-          const preco = precoDe(chave);
-          const indisponivel = indisponiveis.has(chave);
-          return (
-            <li
-              key={chave}
-              className={`flex gap-4 rounded-2xl border bg-superficie p-4 shadow-pousada ${
-                indisponivel ? "border-alerta-texto/40" : "border-borda"
-              }`}
-            >
-              <Link
-                href={`/produto/${item.slug}`}
-                className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-borda bg-white"
-              >
-                {item.foto && (
-                  <Image
-                    src={urlFoto(item.foto)!}
-                    alt=""
-                    fill
-                    sizes="80px"
-                    className="object-contain p-1"
-                  />
+    <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      {/* ------------------------------------------------- tabela do pedido */}
+      <div className="h-fit overflow-hidden rounded-2xl border border-borda/60 bg-superficie shadow-pousada">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-sm">
+            <thead>
+              <tr className="border-b border-borda bg-superficie-2 text-left text-xs uppercase tracking-wide text-tenue">
+                <th scope="col" className="px-4 py-3 font-medium">Produto</th>
+                <th scope="col" className="px-2 py-3 font-medium">Tam.</th>
+                <th scope="col" className="px-2 py-3 text-center font-medium">Emb. c/</th>
+                <th scope="col" className="px-2 py-3 text-center font-medium">Qtd</th>
+                {podeVerPrecos && (
+                  <>
+                    <th scope="col" className="whitespace-nowrap px-2 py-3 text-right font-medium">Atacado</th>
+                    <th scope="col" className="whitespace-nowrap px-2 py-3 text-right font-medium">Total Atacado</th>
+                  </>
                 )}
-              </Link>
-
-              <div className="flex min-w-0 flex-1 flex-col">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <Link
-                      href={`/produto/${item.slug}`}
-                      className="line-clamp-2 text-sm font-medium text-texto transition hover:text-acento-texto"
-                    >
-                      {item.titulo}
-                    </Link>
-                    <p className="mt-0.5 text-xs text-suave">
-                      Ref. {item.modelo}
-                      {item.tamanho && ` · tam. ${item.tamanho}`} · kit c/{" "}
-                      {item.pecasNoKit}
-                    </p>
-                    {indisponivel && (
-                      <p className="mt-1 text-xs font-semibold text-alerta-texto">
-                        Este item saiu do catálogo — remova para fechar o pedido.
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removerDoCarrinho(chave)}
-                    aria-label={`Remover ${item.titulo} do pedido`}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-tenue transition hover:bg-superficie-2 hover:text-acento-texto"
+                {exibirVarejo && (
+                  <>
+                    <th scope="col" className="whitespace-nowrap px-2 py-3 text-right font-medium">Varejo</th>
+                    <th scope="col" className="whitespace-nowrap px-2 py-3 text-right font-medium">Total Varejo</th>
+                  </>
+                )}
+                <th scope="col" className="px-2 py-3">
+                  <span className="sr-only">Remover</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {itens.map((item) => {
+                const chave = chaveItem(item);
+                const preco = precoDe(chave);
+                const indisponivel = indisponiveis.has(chave);
+                return (
+                  <tr
+                    key={chave}
+                    className={`border-b border-borda last:border-0 ${
+                      indisponivel ? "bg-alerta-fundo" : ""
+                    }`}
                   >
-                    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
-                      <path d="M5 7h14M10 11v6M14 11v6M7 7l1 13h8l1-13M9 7V4h6v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="mt-auto flex items-end justify-between gap-3 pt-2">
-                  <div className="flex items-center rounded-lg border border-borda">
-                    <button
-                      type="button"
-                      onClick={() => alterarQtdDoCarrinho(chave, item.qtdKits - 1)}
-                      aria-label="Tirar um kit"
-                      className="flex h-9 w-9 items-center justify-center text-suave transition hover:text-texto"
-                    >
-                      −
-                    </button>
-                    <span aria-live="polite" className="w-8 text-center text-sm font-semibold tabular-nums text-texto">
-                      {item.qtdKits}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => alterarQtdDoCarrinho(chave, item.qtdKits + 1)}
-                      aria-label="Somar um kit"
-                      className="flex h-9 w-9 items-center justify-center text-suave transition hover:text-texto"
-                    >
-                      +
-                    </button>
-                  </div>
-
-                  {preco ? (
-                    <div className="text-right">
-                      <p className="text-sm font-semibold tabular-nums text-texto">
-                        {reais(preco.precoKitAtacado * item.qtdKits)}
+                    <td className="px-4 py-2.5">
+                      <Link
+                        href={`/produto/${item.slug}`}
+                        className="font-medium text-texto transition hover:text-acento-texto"
+                      >
+                        {item.titulo}
+                      </Link>
+                      <p className="text-xs text-suave">
+                        Ref. {item.modelo}
+                        {item.marca ? ` · ${item.marca}` : ""}
                       </p>
-                      <p className="text-xs tabular-nums text-suave">
-                        {reais(preco.precoKitAtacado)} /kit
-                      </p>
-                    </div>
-                  ) : (
-                    podeVerPrecos || (
-                      <p className="text-xs text-tenue">preço no login</p>
-                    )
+                      {indisponivel && (
+                        <p className="mt-0.5 text-xs font-semibold text-alerta-texto">
+                          Saiu do catálogo — remova para fechar o pedido.
+                        </p>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-2.5 text-suave">
+                      {item.tamanho ?? "Único"}
+                    </td>
+                    <td className="px-2 py-2.5 text-center tabular-nums text-suave">
+                      {item.pecasNoKit}
+                    </td>
+                    <td className="px-2 py-2.5">
+                      <div className="mx-auto flex w-fit items-center rounded-lg border border-borda bg-superficie">
+                        <button
+                          type="button"
+                          onClick={() => alterarQtdDoCarrinho(chave, item.qtdKits - 1)}
+                          aria-label={`Tirar uma embalagem de ${item.titulo}`}
+                          className="flex h-8 w-8 items-center justify-center text-suave transition hover:text-texto"
+                        >
+                          −
+                        </button>
+                        <span aria-live="polite" className="w-7 text-center text-sm font-semibold tabular-nums text-texto">
+                          {item.qtdKits}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => alterarQtdDoCarrinho(chave, item.qtdKits + 1)}
+                          aria-label={`Somar uma embalagem de ${item.titulo}`}
+                          className="flex h-8 w-8 items-center justify-center text-suave transition hover:text-texto"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </td>
+                    {podeVerPrecos && (
+                      <>
+                        <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-suave">
+                          {preco ? reais(preco.precoKitAtacado) : "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-2.5 text-right font-medium tabular-nums text-texto">
+                          {preco ? reais(preco.precoKitAtacado * item.qtdKits) : "—"}
+                        </td>
+                      </>
+                    )}
+                    {exibirVarejo && (
+                      <>
+                        <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-suave">
+                          {preco && preco.precoKitVarejo > 0 ? reais(preco.precoKitVarejo) : "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-suave">
+                          {preco && preco.precoKitVarejo > 0
+                            ? reais(preco.precoKitVarejo * item.qtdKits)
+                            : "—"}
+                        </td>
+                      </>
+                    )}
+                    <td className="px-2 py-2.5 text-center">
+                      <button
+                        type="button"
+                        onClick={() => removerDoCarrinho(chave)}
+                        aria-label={`Remover ${item.titulo} do pedido`}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-tenue transition hover:bg-superficie-2 hover:text-acento-texto"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+                          <path d="M5 7h14M10 11v6M14 11v6M7 7l1 13h8l1-13M9 7V4h6v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            {podeVerPrecos && (
+              <tfoot>
+                <tr className="border-t-2 border-borda bg-superficie-2 font-semibold text-texto">
+                  <td className="px-4 py-3" colSpan={3}>
+                    Totais
+                  </td>
+                  <td className="px-2 py-3 text-center tabular-nums">{totalEmbalagens}</td>
+                  <td className="px-2 py-3" />
+                  <td className="whitespace-nowrap px-2 py-3 text-right tabular-nums">
+                    {reais(totalAtacado)}
+                  </td>
+                  {exibirVarejo && (
+                    <>
+                      <td className="px-2 py-3" />
+                      <td className="whitespace-nowrap px-2 py-3 text-right tabular-nums text-suave">
+                        {reais(totalVarejo)}
+                      </td>
+                    </>
                   )}
-                </div>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                  <td className="px-2 py-3" />
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+        <p className="border-t border-borda px-4 py-2.5 text-xs text-tenue">
+          Qtd = embalagens fechadas. Seu carrinho fica salvo neste navegador por
+          até 90 dias.
+        </p>
+      </div>
 
       {/* ----------------------------------------------------------- resumo */}
       <aside className="h-fit rounded-2xl border border-borda/60 bg-superficie p-5 shadow-suave lg:sticky lg:top-40">
@@ -258,8 +324,8 @@ export function PaginaCarrinhoCliente() {
 
         <dl className="mt-3 space-y-1.5 text-sm">
           <div className="flex justify-between">
-            <dt className="text-suave">Kits</dt>
-            <dd className="font-medium tabular-nums text-texto">{totalKits}</dd>
+            <dt className="text-suave">Embalagens</dt>
+            <dd className="font-medium tabular-nums text-texto">{totalEmbalagens}</dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-suave">Peças</dt>
@@ -267,9 +333,17 @@ export function PaginaCarrinhoCliente() {
           </div>
           {podeVerPrecos && (
             <div className="flex justify-between border-t border-borda pt-2 text-base">
-              <dt className="font-semibold text-texto">Total (atacado)</dt>
+              <dt className="font-semibold text-texto">Total Atacado</dt>
               <dd className="font-bold tabular-nums text-texto">
                 {reais(totalAtacado)}
+              </dd>
+            </div>
+          )}
+          {exibirVarejo && (
+            <div className="flex justify-between">
+              <dt className="text-suave">Total Varejo</dt>
+              <dd className="font-medium tabular-nums text-suave">
+                {reais(totalVarejo)}
               </dd>
             </div>
           )}
@@ -277,10 +351,11 @@ export function PaginaCarrinhoCliente() {
 
         {podeVerPrecos ? (
           <>
-            {faltaParaMinimo > 0 && (
+            {abaixoDoMinimo && (
               <p className="mt-3 rounded-lg bg-alerta-fundo px-3 py-2 text-xs font-medium leading-relaxed text-alerta-texto">
-                Pedido mínimo de {reais(situacao!.pedidoMinimo)} — faltam{" "}
-                {reais(faltaParaMinimo)}.
+                Compras no atacado são a partir de {reais(pedidoMinimo)} — o seu
+                pedido está em {reais(totalAtacado)}. Dá para fechar mesmo
+                assim: nossa equipe confirma as condições com você.
               </p>
             )}
 
@@ -306,7 +381,7 @@ export function PaginaCarrinhoCliente() {
             <button
               type="button"
               onClick={confirmar}
-              disabled={fechando || faltaParaMinimo > 0 || temIndisponivel || totalKits === 0}
+              disabled={fechando || temIndisponivel || totalEmbalagens === 0}
               className="mt-4 h-12 w-full rounded-full bg-acento text-sm font-semibold text-white transition hover:bg-acento-forte disabled:cursor-not-allowed disabled:opacity-40"
             >
               {fechando ? "Fechando pedido…" : "Fechar pedido"}
@@ -325,8 +400,8 @@ export function PaginaCarrinhoCliente() {
             </p>
             <p className="mt-1 text-xs leading-relaxed text-suave">
               {situacao.logado
-                ? "Assim que a equipe aprovar o seu cadastro, os preços aparecem e o pedido pode ser fechado."
-                : "O carrinho fica guardado. Entre na conta ou cadastre a sua loja para fechar o pedido com preço de atacado."}
+                ? "Assim que a equipe aprovar o seu cadastro, os preços de Atacado e Varejo aparecem e o pedido pode ser fechado."
+                : "O carrinho fica guardado. Entre na conta ou cadastre a sua loja para fechar o pedido com preço de Atacado e Varejo."}
             </p>
             {!situacao.logado && (
               <div className="mt-3 flex flex-col gap-2">

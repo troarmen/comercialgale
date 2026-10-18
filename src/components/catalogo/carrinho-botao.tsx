@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCarrinho } from "./carrinho";
 
-/** Atalho do carrinho no topo, com a contagem de kits. */
+/** Atalho do carrinho no topo, com a contagem de embalagens. */
 export function CarrinhoBotao() {
   const { itens, pronto } = useCarrinho();
   const total = itens.reduce((soma, i) => soma + i.qtdKits, 0);
@@ -27,7 +27,7 @@ export function CarrinhoBotao() {
       <span className="hidden sm:inline">Pedido</span>
       {pronto && total > 0 && (
         <span
-          aria-label={`${total} ${total === 1 ? "kit" : "kits"} no pedido`}
+          aria-label={`${total} ${total === 1 ? "embalagem" : "embalagens"} no pedido`}
           className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-acento px-1 text-[11px] font-bold text-white"
         >
           {total > 99 ? "99+" : total}

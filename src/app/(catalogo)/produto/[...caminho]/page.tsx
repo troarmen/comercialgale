@@ -54,7 +54,7 @@ export async function generateMetadata(
     title: `${produto.titulo} ${produto.modelo}${marca ? ` — ${marca}` : ""} no Atacado`,
     description:
       resumoDescricao ||
-      `${produto.titulo} (ref. ${produto.modelo})${marca ? ` da ${marca}` : ""} no atacado da Comercial Galé${categoria ? `, linha ${categoria.toLowerCase()}` : ""}. Kit fechado para revenda, direto de São Paulo.`,
+      `${produto.titulo} (ref. ${produto.modelo})${marca ? ` da ${marca}` : ""} no atacado da Comercial Galé${categoria ? `, linha ${categoria.toLowerCase()}` : ""}. Embalagem fechada com preço de Atacado e de Varejo, direto de São Paulo.`,
     alternates: { canonical: `/produto/${produto.slug}` },
     openGraph: {
       type: "website",
@@ -158,7 +158,7 @@ export default async function PaginaProduto(
             <div className="flex gap-1.5">
               <dt>Venda:</dt>
               <dd className="font-medium text-texto">
-                kit com {pecas} {pecas === 1 ? "peça" : "peças"}
+                embalagem com {pecas} {pecas === 1 ? "peça" : "peças"}
               </dd>
             </div>
             {produto.lancamento && (
@@ -175,6 +175,7 @@ export default async function PaginaProduto(
                 slug: produto.slug,
                 titulo: produto.titulo,
                 modelo: produto.modelo,
+                marca: produto.fabricantes?.nome ?? null,
                 foto: produto.produto_imagens[0]?.storage_path ?? null,
               }}
               grade={grade}
@@ -205,7 +206,12 @@ export default async function PaginaProduto(
           </h2>
           <GradeProdutos>
             {relacionados.map((p) => (
-              <CartaoProduto key={p.id} produto={p} faixa={precosRelacionados.get(p.id)} />
+              <CartaoProduto
+                key={p.id}
+                produto={p}
+                faixa={precosRelacionados.get(p.id)}
+                exibirVarejo={config.exibirVarejo}
+              />
             ))}
           </GradeProdutos>
         </section>

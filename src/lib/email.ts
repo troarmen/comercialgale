@@ -56,7 +56,7 @@ function corpoTexto(pedido: PedidoParaEmail, paraLojista: boolean) {
   const linhas = pedido.itens
     .map(
       (i) =>
-        `• ${i.titulo} (ref. ${i.modelo})${i.tamanho ? ` · tam. ${i.tamanho}` : ""} — ${i.qtdKits} kit(s) de ${i.pecasNoKit} peça(s) × ${reais(i.precoKit)} = ${reais(i.qtdKits * i.precoKit)}`,
+        `• ${i.titulo} (ref. ${i.modelo})${i.tamanho ? ` · tam. ${i.tamanho}` : ""} — ${i.qtdKits} ${i.qtdKits === 1 ? "embalagem" : "embalagens"} de ${i.pecasNoKit} ${i.pecasNoKit === 1 ? "peça" : "peças"} × ${reais(i.precoKit)} = ${reais(i.qtdKits * i.precoKit)}`,
     )
     .join("\n");
 
@@ -70,7 +70,7 @@ Itens:
 ${linhas}
 
 Total de peças: ${pedido.totalPecas}
-Total (atacado): ${reais(pedido.totalAtacado)}
+Total Atacado: ${reais(pedido.totalAtacado)}
 ${pedido.observacoes ? `\nObservações do cliente:\n${pedido.observacoes}\n` : ""}
 —
 ${CONTATO.nome} · ${CONTATO.endereco.logradouro}, ${CONTATO.endereco.bairro} — ${CONTATO.endereco.cidade}/${CONTATO.endereco.uf}

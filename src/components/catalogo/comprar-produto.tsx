@@ -8,9 +8,9 @@ import { adicionarAoCarrinho } from "./carrinho";
 /**
  * Caixa de compra da ficha do produto.
  *
- * Atacado se compra em grade: em vez de "escolha um tamanho", cada tamanho tem
- * o seu contador de kits e um botão só manda tudo para o pedido. O lojista
- * monta a grade como faria no balcão.
+ * Atacado se compra em grade: cada tamanho tem o seu contador de embalagens e
+ * um botão só manda tudo para o pedido. A tabela mostra o preço de Atacado e o
+ * de Varejo lado a lado — vocabulário do balcão da Galé (não "preço sugerido").
  *
  * Sem login liberado não existe linha de preço (a view devolve vazio) — a
  * caixa vira o convite de cadastro, com os tamanhos visíveis a título de
@@ -37,6 +37,7 @@ export function ComprarProduto({
     slug: string;
     titulo: string;
     modelo: string;
+    marca: string | null;
     foto: string | null;
   };
   /** linhas da view de preços — vazio quando o visitante não pode ver */
@@ -48,6 +49,8 @@ export function ComprarProduto({
 }) {
   const [qtds, setQtds] = useState<Record<string, number>>({});
   const [confirmacao, setConfirmacao] = useState(false);
+
+  const rotuloEmbalagem = `embalagem com ${pecasNoKit} ${pecasNoKit === 1 ? "peça" : "peças"}`;
 
   // ---------------------------------------------------------- sem preço
   if (!grade.length) {
@@ -77,11 +80,11 @@ export function ComprarProduto({
               <rect x="3.5" y="7" width="9" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
               <path d="M5.5 7V5.5a2.5 2.5 0 0 1 5 0V7" stroke="currentColor" strokeWidth="1.4" />
             </svg>
-            Preço de atacado é para clientes cadastrados
+            Preço de Atacado e de Varejo para clientes cadastrados
           </p>
           <p className="mt-1.5 text-sm leading-relaxed text-suave">
             Cadastre a sua loja gratuitamente. Assim que o acesso for liberado,
-            você vê os preços de todo o catálogo e monta o pedido online.
+            você vê os dois preços de todo o catálogo e monta o pedido online.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Link
@@ -103,7 +106,9 @@ export function ComprarProduto({
   }
 
   // ---------------------------------------------------------- com preço
-  const totalKits = Object.values(qtds).reduce((s, n) => s + n, 0);
+  // produto sem preço de varejo cadastrado (0) não ganha coluna de R$ 0,00
+  const temVarejo = exibirVarejo && grade.some((l) => l.precoKitVarejo > 0);
+  const totalEmbalagens = Object.values(qtds).reduce((s, n) => s + n, 0);
   const totalValor = grade.reduce(
     (s, l) => s + (qtds[String(l.produtoTamanhoId)] ?? 0) * l.precoKitAtacado,
     0,
@@ -128,6 +133,7 @@ export function ComprarProduto({
           titulo: produto.titulo,
           modelo: produto.modelo,
           tamanho: linha.tamanho,
+          marca: produto.marca,
           pecasNoKit,
           foto: produto.foto,
         },
@@ -143,22 +149,19 @@ export function ComprarProduto({
     <div className="rounded-2xl border border-borda/60 bg-superficie p-5 shadow-suave sm:p-6">
       <h2 className="text-sm font-semibold text-texto">
         Monte a sua grade
-        <span className="ml-2 font-normal text-suave">
-          kit fechado com {pecasNoKit} {pecasNoKit === 1 ? "peça" : "peças"}
-        </span>
+        <span className="ml-2 font-normal text-suave">{rotuloEmbalagem}</span>
       </h2>
 
-      <table className="mt-3 w-full text-sm">
+      <div className="mt-3 overflow-x-auto">
+      <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-borda text-left text-xs uppercase tracking-wide text-tenue">
             <th className="py-2 pr-2 font-medium">Tamanho</th>
-            <th className="py-2 pr-2 text-right font-medium">Kit</th>
-            {pecasNoKit > 1 && (
-              <th className="hidden py-2 pr-2 text-right font-medium sm:table-cell">
-                Por peça
-              </th>
+            <th className="py-2 pr-2 text-right font-medium">Atacado</th>
+            {temVarejo && (
+              <th className="py-2 pr-2 text-right font-medium">Varejo</th>
             )}
-            <th className="py-2 text-right font-medium">Kits</th>
+            <th className="py-2 text-right font-medium">Qtd</th>
           </tr>
         </thead>
         <tbody>
@@ -170,12 +173,26 @@ export function ComprarProduto({
                 <td className="py-2.5 pr-2 font-medium text-texto">
                   {linha.tamanho ?? "Único"}
                 </td>
-                <td className="py-2.5 pr-2 text-right tabular-nums text-texto">
-                  {reais(linha.precoKitAtacado)}
+                <td className="py-2.5 pr-2 text-right">
+                  <span className="font-medium tabular-nums text-texto">
+                    {reais(linha.precoKitAtacado)}
+                  </span>
+                  {pecasNoKit > 1 && (
+                    <span className="hidden text-xs tabular-nums text-suave sm:block">
+                      {reais(linha.precoUnitarioAtacado)}/peça
+                    </span>
+                  )}
                 </td>
-                {pecasNoKit > 1 && (
-                  <td className="hidden py-2.5 pr-2 text-right tabular-nums text-suave sm:table-cell">
-                    {reais(linha.precoUnitarioAtacado)}
+                {temVarejo && (
+                  <td className="py-2.5 pr-2 text-right">
+                    <span className="tabular-nums text-suave">
+                      {linha.precoKitVarejo > 0 ? reais(linha.precoKitVarejo) : "—"}
+                    </span>
+                    {pecasNoKit > 1 && linha.precoKitVarejo > 0 && (
+                      <span className="hidden text-xs tabular-nums text-tenue sm:block">
+                        {reais(linha.precoKitVarejo / pecasNoKit)}/peça
+                      </span>
+                    )}
                   </td>
                 )}
                 <td className="py-2">
@@ -184,7 +201,7 @@ export function ComprarProduto({
                       type="button"
                       onClick={() => mudar(chave, -1)}
                       disabled={qtd <= 0}
-                      aria-label={`Tirar um kit do tamanho ${linha.tamanho ?? "único"}`}
+                      aria-label={`Tirar uma embalagem do tamanho ${linha.tamanho ?? "único"}`}
                       className="flex h-9 w-9 items-center justify-center text-suave transition hover:text-texto disabled:opacity-30"
                     >
                       −
@@ -198,7 +215,7 @@ export function ComprarProduto({
                     <button
                       type="button"
                       onClick={() => mudar(chave, 1)}
-                      aria-label={`Somar um kit do tamanho ${linha.tamanho ?? "único"}`}
+                      aria-label={`Somar uma embalagem do tamanho ${linha.tamanho ?? "único"}`}
                       className="flex h-9 w-9 items-center justify-center text-suave transition hover:text-texto"
                     >
                       +
@@ -210,25 +227,23 @@ export function ComprarProduto({
           })}
         </tbody>
       </table>
+      </div>
 
-      {exibirVarejo && grade[0] && grade[0].precoKitVarejo > 0 && (
-        <p className="mt-3 text-xs leading-relaxed text-suave">
-          Revenda sugerida: {reais(grade[0].precoKitVarejo)} o kit
-          {pecasNoKit > 1 &&
-            ` (${reais(grade[0].precoKitVarejo / pecasNoKit)} por peça)`}{" "}
-          — sua margem de referência.
-        </p>
-      )}
+      <p className="mt-3 text-xs leading-relaxed text-suave">
+        Preços por embalagem fechada ({rotuloEmbalagem}). Atacado é o seu
+        preço de lojista; Varejo é o preço de revenda ao consumidor.
+      </p>
 
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-borda pt-4">
         <div className="text-sm text-suave">
-          {totalKits > 0 ? (
+          {totalEmbalagens > 0 ? (
             <>
-              <span className="font-semibold text-texto">{totalKits}</span>{" "}
-              {totalKits === 1 ? "kit" : "kits"} ·{" "}
+              <span className="font-semibold text-texto">{totalEmbalagens}</span>{" "}
+              {totalEmbalagens === 1 ? "embalagem" : "embalagens"} ·{" "}
               <span className="font-semibold tabular-nums text-texto">
                 {reais(totalValor)}
-              </span>
+              </span>{" "}
+              no atacado
             </>
           ) : (
             "Escolha as quantidades"
@@ -237,7 +252,7 @@ export function ComprarProduto({
         <button
           type="button"
           onClick={adicionarTudo}
-          disabled={totalKits <= 0}
+          disabled={totalEmbalagens <= 0}
           className="flex h-11 items-center rounded-full bg-acento px-6 text-sm font-semibold text-white shadow-cta transition duration-200 hover:bg-acento-forte disabled:cursor-not-allowed disabled:shadow-none disabled:opacity-40"
         >
           Adicionar ao pedido

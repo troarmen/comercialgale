@@ -43,7 +43,7 @@ export async function generateMetadata({
   return {
     title: "Catálogo de produtos no atacado",
     description:
-      "Todos os produtos da Comercial Galé: lingerie, meias, cuecas e pijamas no atacado para lojistas. Venda em kits fechados com preço de revenda sugerido.",
+      "Todos os produtos da Comercial Galé: lingerie, meias, cuecas e pijamas no atacado para lojistas. Venda em embalagens fechadas com preço de Atacado e de Varejo.",
     ...(filtrado ? { robots: { index: false, follow: true } } : {}),
     alternates: {
       canonical: pagina > 1 ? `/produtos?pagina=${pagina}` : "/produtos",
@@ -75,7 +75,7 @@ export default async function PaginaProdutos({
         <p className="mt-1 max-w-2xl text-sm text-suave">
           {filtros.busca
             ? "A busca olha nome, referência, marca e descrição."
-            : "Lingerie, meias, cuecas e pijamas no atacado, em kits fechados para revenda."}
+            : "Lingerie, meias, cuecas e pijamas em embalagens fechadas, com preço de Atacado e de Varejo."}
         </p>
       </header>
 

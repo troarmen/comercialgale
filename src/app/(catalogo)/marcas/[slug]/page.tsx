@@ -27,7 +27,7 @@ export async function generateMetadata(
     title: `${marca.nome} no Atacado`,
     description:
       marca.descricao ??
-      `Produtos ${marca.nome} no atacado da Comercial Galé, em kits fechados para revenda. Distribuidora de moda íntima desde 1976, em São Paulo.`,
+      `Produtos ${marca.nome} no atacado da Comercial Galé, em embalagens fechadas, com preço de Atacado e de Varejo. Distribuidora de moda íntima desde 1976, em São Paulo.`,
     ...(sp.ordem ? { robots: { index: false, follow: true } } : {}),
     alternates: { canonical: pagina > 1 ? `${base}?pagina=${pagina}` : base },
   };

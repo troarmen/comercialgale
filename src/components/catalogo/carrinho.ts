@@ -25,6 +25,8 @@ export type ItemCarrinho = {
   titulo: string;
   modelo: string;
   tamanho: string | null;
+  /** nome do fabricante — itens gravados antes de out/2026 não têm */
+  marca?: string | null;
   pecasNoKit: number;
   foto: string | null;
   qtdKits: number;
@@ -33,6 +35,15 @@ export type ItemCarrinho = {
 type Estado = { itens: ItemCarrinho[]; pronto: boolean };
 
 const ARMAZENAMENTO = "gale:carrinho";
+
+/**
+ * Pedido de atacado se monta em dias, não em minutos (feedback do cliente:
+ * lojista perdeu um carrinho grande no site antigo, que expirava por sessão).
+ * Aqui o carrinho mora no localStorage e NÃO expira por inatividade — só é
+ * descartado depois de 90 dias sem nenhuma mexida, para um carrinho esquecido
+ * de meses não ressuscitar com catálogo defasado.
+ */
+const VALIDADE_DIAS = 90;
 const ESTADO_SERVIDOR: Estado = { itens: [], pronto: false };
 
 let estado: Estado = ESTADO_SERVIDOR;
@@ -49,8 +60,13 @@ export function chaveItem(i: {
 function lerArmazenamento(): ItemCarrinho[] {
   try {
     const bruto = localStorage.getItem(ARMAZENAMENTO);
-    const lista = bruto ? JSON.parse(bruto) : [];
-    return Array.isArray(lista) ? lista : [];
+    const dado = bruto ? JSON.parse(bruto) : null;
+    // formato antigo (array puro, sem data) continua valendo
+    if (Array.isArray(dado)) return dado;
+    if (!dado || !Array.isArray(dado.itens)) return [];
+    const idade = Date.now() - (Number(dado.salvoEm) || 0);
+    if (idade > VALIDADE_DIAS * 24 * 60 * 60 * 1000) return [];
+    return dado.itens;
   } catch {
     return [];
   }
@@ -63,7 +79,10 @@ function emitir() {
 function gravar(itens: ItemCarrinho[]) {
   estado = { itens, pronto: true };
   try {
-    localStorage.setItem(ARMAZENAMENTO, JSON.stringify(itens));
+    localStorage.setItem(
+      ARMAZENAMENTO,
+      JSON.stringify({ itens, salvoEm: Date.now() }),
+    );
   } catch {
     // armazenamento cheio ou bloqueado: o carrinho vale só nesta aba
   }

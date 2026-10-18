@@ -11,10 +11,13 @@ export function CartaoProduto({
   produto,
   faixa,
   prioridade = false,
+  exibirVarejo = true,
 }: {
   produto: ProdutoResumo;
   faixa?: FaixaPreco;
   prioridade?: boolean;
+  /** respeita configuracoes.exibir_preco_varejo */
+  exibirVarejo?: boolean;
 }) {
   const foto =
     produto.produto_imagens.find((i) => i.principal) ?? produto.produto_imagens[0];
@@ -67,7 +70,7 @@ export function CartaoProduto({
           </Link>
         </h3>
         <p className="text-xs text-suave">
-          Ref. {produto.modelo} · kit c/ {pecas} {pecas === 1 ? "peça" : "peças"}
+          Ref. {produto.modelo} · emb. c/ {pecas} {pecas === 1 ? "peça" : "peças"}
         </p>
 
         <div className="mt-auto pt-2">
@@ -75,13 +78,16 @@ export function CartaoProduto({
             <>
               <p className="text-base font-semibold tabular-nums text-texto">
                 {faixaPreco(faixa.kitMin, faixa.kitMax)}
-                <span className="text-xs font-normal text-suave"> /kit</span>
+                <span className="text-xs font-normal text-suave"> Atacado</span>
               </p>
-              {pecas > 1 && (
-                <p className="text-xs tabular-nums text-suave">
-                  {faixaPreco(faixa.unitarioMin, faixa.unitarioMax)} por peça
-                </p>
-              )}
+              <p className="text-xs tabular-nums text-suave">
+                {pecas > 1 &&
+                  `${faixaPreco(faixa.unitarioMin, faixa.unitarioMax)} por peça`}
+                {pecas > 1 && exibirVarejo && faixa.varejoMin > 0 && " · "}
+                {exibirVarejo &&
+                  faixa.varejoMin > 0 &&
+                  `Varejo ${faixaPreco(faixa.varejoMin, faixa.varejoMax)}`}
+              </p>
             </>
           ) : (
             <p className="flex items-center gap-1.5 text-xs font-medium text-tenue">
@@ -89,7 +95,7 @@ export function CartaoProduto({
                 <rect x="3.5" y="7" width="9" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
                 <path d="M5.5 7V5.5a2.5 2.5 0 0 1 5 0V7" stroke="currentColor" strokeWidth="1.4" />
               </svg>
-              Preço para clientes cadastrados
+              Atacado e Varejo para clientes cadastrados
             </p>
           )}
         </div>
