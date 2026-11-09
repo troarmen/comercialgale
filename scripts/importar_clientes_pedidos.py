@@ -135,6 +135,9 @@ def importar_clientes():
             "uf": (c.get("uf") or "")[:2] or None,
             "pais": c.get("pais") or "Brasil",
             "observacoes": c.get("observacoes"),
+            # data real do cadastro no legado (ver migração 004); sem isto o
+            # cliente novo entraria com a data do dia da importação
+            "cadastrado_em": data_br(c.get("data_cadastro")),
         })
 
     gravados = enviar("clientes", registros)
@@ -254,7 +257,20 @@ def importar_pedidos(mapa_clientes):
             })
 
     log(f"  itens: {len(itens)}")
-    # pedido_itens não tem legado_id; inserimos direto, sem upsert
+    # pedido_itens não tem legado_id, então não dá upsert. Para a importação
+    # poder rodar de novo (atualização na virada), apagamos antes os itens dos
+    # pedidos LEGADOS que vamos regravar — sem isso, cada execução duplicaria
+    # todos os itens e o gatilho dobraria os totais. Pedidos feitos no site
+    # novo não têm legado_id, não estão em mapa_pedidos e não são tocados.
+    ids = list(mapa_pedidos.values())
+    for i in range(0, len(ids), LOTE):
+        lote = ",".join(str(x) for x in ids[i:i + LOTE])
+        r = S.delete(f"{URL}/rest/v1/pedido_itens?pedido_id=in.({lote})",
+                     headers={"Prefer": "return=minimal"}, timeout=180)
+        if r.status_code >= 300:
+            raise SystemExit(f"FALHA limpando pedido_itens (HTTP {r.status_code}): {r.text[:700]}")
+    log(f"  itens antigos de {len(ids)} pedidos legados removidos")
+
     for i in range(0, len(itens), LOTE):
         lote = itens[i:i + LOTE]
         r = S.post(f"{URL}/rest/v1/pedido_itens",
