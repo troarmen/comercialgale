@@ -6,6 +6,13 @@ senha. Faça **na ordem** — cada passo depende do anterior.
 Já feito em produção em 18/10/2026 (não refazer): cadastro público do
 Supabase Auth **desligado**; migrações **005 a 008** aplicadas.
 
+**Situação em 12/11/2026 (depois da virada do domínio):** o
+`comercialgale.com.br` aponta para a Vercel desde a noite de 11 para 12/11.
+O DNS mora na **Locaweb** (painel-dns.locaweb.com.br; nameservers
+`ns1/ns2/ns3.locaweb.com.br` no Registro.br), não mais na KingHost. O domínio
+foi autenticado no Brevo em 12/11 (passo 1 feito) e as variáveis SMTP foram
+criadas na Vercel (passo 2 feito); `URL_LINKS_EMAIL` foi apagada.
+
 ---
 
 ## 1. Brevo — autenticar o domínio (antes de tudo: o DNS demora)
@@ -17,9 +24,11 @@ vários domínios.
    Adicionar domínio** → `comercialgale.com.br`.
 2. O Brevo mostra os registros DNS (código de verificação `brevo-code`,
    **DKIM** e **DMARC**). Publique **exatamente** o que ele mostrar no painel
-   de DNS da **KingHost** — é lá que o domínio está
-   (`dns1/dns2.kinghost.com.br`, conferido em 18/10/2026). A caixa
-   `contato@` é da **Locaweb** (MX) e não muda nada.
+   de DNS da **Locaweb** (painel-dns.locaweb.com.br) — é lá que a zona está
+   desde 11/11/2026. O `brevo-code` entra como mais um conteúdo do TXT `.`
+   (junto do `_globalsign` e do SPF); os DKIM são CNAMEs `brevo1._domainkey`
+   e `brevo2._domainkey`. A caixa `contato@` é da **Locaweb** (MX) e não
+   muda nada.
 3. **Cuidado com o SPF.** Já existe `v=spf1 include:_spf.locaweb.com.br -all`.
    **Edite esse registro** — não crie outro: domínio com DOIS `v=spf1` falha o
    SPF inteiro. Fica:
@@ -52,18 +61,16 @@ Environment Variables** → ambiente **Production**:
 | `SMTP_USER` | login do passo 1.7 |
 | `SMTP_SENHA` | chave SMTP do passo 1.7 — marque como **Sensitive** |
 | `EMAIL_REMETENTE` | `Comercial Galé <contato@comercialgale.com.br>` |
-| `URL_LINKS_EMAIL` | `https://comercialgale.vercel.app` |
-
-**Não mexa no `NEXT_PUBLIC_SITE_URL`** — ele é o canônico do SEO e já está
-(certo) como `https://www.comercialgale.com.br`. O `URL_LINKS_EMAIL` existe
-justamente porque, até a virada, o `www` abre o site ANTIGO: sem ele, todo
-link de "criar senha" e "aprovar cadastro" cairia lá.
+**Depois da virada (12/11/2026) não existe mais `URL_LINKS_EMAIL`** — os
+links usam o `NEXT_PUBLIC_SITE_URL` ou, sem ele, o padrão
+`https://www.comercialgale.com.br` (hoje a Vercel não tem
+`NEXT_PUBLIC_SITE_URL`, e o padrão é o valor certo). Só recrie
+`URL_LINKS_EMAIL=https://comercialgale.vercel.app` num rollback do domínio.
 
 Variável nova só vale a partir do próximo deploy — faça este passo **antes**
 do push do passo 4.
 
-> **No dia da virada do domínio** (`www` → Vercel): apague o
-> `URL_LINKS_EMAIL` e faça um redeploy. Os links passam a usar o `www`.
+> A virada do domínio foi feita na noite de 11 para 12/11/2026.
 
 ## 3. Migração 009 no Supabase de produção
 
