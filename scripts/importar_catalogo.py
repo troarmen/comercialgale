@@ -47,8 +47,10 @@ def log(m):
 
 
 def carrega_env():
+    # GALE_ENV=.env.producao.local aponta para o Supabase de produção; sem
+    # ela, usa o .env.local (normalmente o Supabase local, 127.0.0.1)
     env = {}
-    with open(os.path.join(RAIZ, ".env.local"), encoding="utf-8") as f:
+    with open(os.path.join(RAIZ, os.environ.get("GALE_ENV", ".env.local")), encoding="utf-8") as f:
         for linha in f:
             linha = linha.strip()
             if linha and not linha.startswith("#") and "=" in linha:
@@ -62,6 +64,11 @@ def carrega_env():
 ENV = carrega_env()
 URL = ENV["NEXT_PUBLIC_SUPABASE_URL"].rstrip("/")
 KEY = ENV["SUPABASE_SERVICE_ROLE_KEY"]
+print(f"Banco de destino: {URL}", flush=True)
+
+# PULAR_LEGADO_IDS=2638,123: produtos que o Arthur já editou no painel novo
+# depois da virada — reimportar do legado apagaria a edição dele.
+PULAR = {int(x) for x in os.environ.get("PULAR_LEGADO_IDS", "").split(",") if x.strip()}
 
 S = requests.Session()
 S.headers.update({
@@ -188,6 +195,12 @@ def importar_produtos(m):
         usados.add(s)
         p["slug_final"] = s
 
+    # o slug é calculado com a lista inteira (acima) para não mudar o de
+    # ninguém; só depois tiramos os produtos que não devem ser regravados
+    if PULAR:
+        prods = [p for p in prods if p["legado_id"] not in PULAR]
+        log(f"  pulando {len(PULAR)} produto(s) editados no painel novo: {sorted(PULAR)}")
+
     linhas = [{
         "legado_id": p["legado_id"],
         "categoria_id": m["cat"][p["categoria_legado_id"]],
@@ -216,7 +229,11 @@ def importar_produtos(m):
         "preco_varejo": t["preco_kit_varejo"],
         "ncm": t.get("ncm"), "ativo": True,
     } for p in prods for t in p["tamanhos"]]
-    upsert("produto_tamanhos", variacoes)
+    # Casa por produto+tamanho, não por legado_id: o legado às vezes apaga e
+    # recria a variação (legado_id novo para o mesmo tamanho), e o upsert por
+    # legado_id bateria em produto_tamanhos_produto_id_tamanho_id_key. Assim a
+    # linha existente é reaproveitada (pedido_itens aponta para o id dela).
+    upsert("produto_tamanhos", variacoes, conflito="produto_id,tamanho_id")
 
     return m_prod, prods
 
@@ -262,7 +279,11 @@ def imagens_existentes(produto_ids):
     faria a primeira colidir com o `{slug}.webp` que já existe, e essa foto
     seria silenciosamente descartada.
     """
-    info, passo = {}, 500
+    # passo pequeno: o PostgREST corta a resposta em 1000 linhas, e 500
+    # produtos x ~3 fotos passava disso — a lista vinha incompleta e o script
+    # achava que faltavam fotos que já estavam no ar (e escolhia nomes de
+    # arquivo sem enxergar os existentes). 100 x até ~10 fotos cabe folgado.
+    info, passo = {}, 100
     ids = list(produto_ids)
     for i in range(0, len(ids), passo):
         lote = ids[i:i + passo]
