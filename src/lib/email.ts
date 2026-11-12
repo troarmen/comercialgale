@@ -91,7 +91,7 @@ Total Atacado: ${reais(pedido.totalAtacado)}
 ${pedido.observacoes ? `\nObservações do cliente:\n${pedido.observacoes}\n` : ""}
 —
 ${CONTATO.nome} · ${CONTATO.endereco.logradouro}, ${CONTATO.endereco.bairro} — ${CONTATO.endereco.cidade}/${CONTATO.endereco.uf}
-${CONTATO.telefoneFixo} · WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}`;
+WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}`;
 }
 
 /** Dispara a confirmação para o cliente e a cópia para a casa. */
@@ -191,7 +191,7 @@ ${link}
 O link vale por 1 hora e funciona uma vez só. Se expirar, peça outro em ${urlDosLinks()}/esqueci-senha.
 ${motivo === "redefinir" ? "\nNão pediu? Pode ignorar este e-mail — a sua senha continua a mesma.\n" : ""}
 —
-${CONTATO.nome} · ${CONTATO.telefoneFixo} · WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}`;
+${CONTATO.nome} · WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}`;
 
   try {
     await t.sendMail({
@@ -260,7 +260,7 @@ export async function enviarEmailsDeCadastro(cadastro: CadastroParaEmail) {
   const remetente = process.env.EMAIL_REMETENTE ?? `Comercial Galé <${CONTATO.email}>`;
   const site = urlDosLinks();
   const rodape = `—
-${CONTATO.nome} · ${CONTATO.telefoneFixo} · WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}`;
+${CONTATO.nome} · WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}`;
 
   const paraLojista = `Olá, ${cadastro.nomeFantasia || cadastro.nome}!
 

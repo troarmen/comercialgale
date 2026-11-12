@@ -28,7 +28,7 @@ export function dadosOrganizacao() {
     url: URL_SITE,
     foundingDate: CONTATO.fundacao,
     email: CONTATO.email,
-    telephone: `+55${CONTATO.telefoneFixo.replace(/\D/g, "")}`,
+    telephone: `+${CONTATO.whatsappE164}`,
     address: {
       "@type": "PostalAddress",
       streetAddress: CONTATO.endereco.logradouro,

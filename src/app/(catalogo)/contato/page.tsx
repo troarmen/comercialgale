@@ -6,7 +6,7 @@ import { dadosContato, dadosTrilha, JsonLd, linkWhatsApp } from "@/lib/seo";
 export const metadata: Metadata = {
   title: "Contato e Como Chegar",
   description:
-    "Fale com a Comercial Galé: WhatsApp, telefone e e-mail. Loja na Avenida Prestes Maia, 454 — Centro de São Paulo, de segunda a sexta, das 07h às 17h.",
+    "Fale com a Comercial Galé por WhatsApp ou e-mail. Loja na Avenida Prestes Maia, 454 — Centro de São Paulo, de segunda a sexta, das 07h às 17h.",
   alternates: { canonical: "/contato" },
 };
 
@@ -16,13 +16,6 @@ const CANAIS = [
     valor: CONTATO.whatsapp,
     href: linkWhatsApp(),
     externo: true,
-    detalhe: "Resposta mais rápida em horário comercial",
-  },
-  {
-    nome: "Telefone",
-    valor: CONTATO.telefoneFixo,
-    href: `tel:+55${CONTATO.telefoneFixo.replace(/\D/g, "")}`,
-    externo: false,
     detalhe: CONTATO.horario,
   },
   {
@@ -50,7 +43,7 @@ export default function PaginaContato() {
         de {CONTATO.horario.toLowerCase()}.
       </p>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
         {CANAIS.map((c) => (
           <a
             key={c.nome}

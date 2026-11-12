@@ -112,10 +112,6 @@ export async function Rodape() {
             </p>
             <p>{CONTATO.horario}</p>
             <p>
-              <a href={`tel:+55${CONTATO.telefoneFixo.replace(/\D/g, "")}`} className="transition hover:text-acento-texto">
-                {CONTATO.telefoneFixo}
-              </a>
-              <br />
               <a href={linkWhatsApp()} target="_blank" rel="noopener noreferrer" className="transition hover:text-acento-texto">
                 {CONTATO.whatsapp} (WhatsApp)
               </a>

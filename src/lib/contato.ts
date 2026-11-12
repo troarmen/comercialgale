@@ -14,7 +14,8 @@ export const CONTATO = {
     uf: "SP",
     regiao: "região da 25 de Março",
   },
-  telefoneFixo: "11 3155-5299",
+  // O fixo (11 3155-5299) foi desativado em nov/2026: o WhatsApp é o
+  // único telefone de atendimento.
   whatsapp: "11 95042-5307",
   whatsappE164: "5511950425307",
   email: "contato@comercialgale.com.br",
