@@ -41,8 +41,11 @@ def log(m):
 
 
 def env():
+    # GALE_ENV=.env.producao.local aponta para o Supabase de produção; sem
+    # ela, usa o .env.local (normalmente o Supabase local, 127.0.0.1)
     d = {}
-    for linha in open(os.path.join(RAIZ, ".env.local"), encoding="utf-8"):
+    arquivo = os.environ.get("GALE_ENV", ".env.local")
+    for linha in open(os.path.join(RAIZ, arquivo), encoding="utf-8"):
         linha = linha.strip()
         if linha and not linha.startswith("#") and "=" in linha:
             k, v = linha.split("=", 1)
@@ -53,6 +56,7 @@ def env():
 E = env()
 URL = E["NEXT_PUBLIC_SUPABASE_URL"].rstrip("/")
 KEY = E["SUPABASE_SERVICE_ROLE_KEY"]
+print(f"Banco de destino: {URL}", flush=True)
 S = requests.Session()
 S.headers.update({
     "apikey": KEY, "Authorization": f"Bearer {KEY}",
