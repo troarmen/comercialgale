@@ -7,7 +7,7 @@ import Link from "next/link";
 export default function ErroCatalogo({ reset }: { reset: () => void }) {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center px-4 py-24 text-center">
-      <Image src="/coracao-gale.png" alt="" width={256} height={256} className="h-12 w-12 opacity-80" />
+      <Image src="/coracao-gale.webp" alt="" width={128} height={128} className="h-12 w-12 opacity-80" />
       <h1 className="mt-4 text-2xl font-bold tracking-tight text-texto">
         Algo deu errado por aqui
       </h1>

@@ -6,6 +6,18 @@ const urlSupabase = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!);
 
 const nextConfig: NextConfig = {
   images: {
+    /*
+     * OTIMIZADOR DESLIGADO (13/11/2026). No plano gratuito da Vercel a cota
+     * mensal de transformações acabou e o `/_next/image` passou a responder
+     * 402 OPTIMIZED_IMAGE_REQUEST_PAYMENT_REQUIRED para toda largura que não
+     * estava em cache: as fotos quebravam no catálogo (visto primeiro na
+     * marca Victory). As fotos do Supabase já são WebP 800×800 de ~23 KB —
+     * o otimizador quase não tinha o que ganhar — e o logo e o coração viraram
+     * WebP pequenos em /public. Com `unoptimized` o <Image> aponta direto para
+     * o arquivo, sem cota nenhuma. Para religar (plano Pro da Vercel), basta
+     * apagar esta linha: o resto da configuração abaixo continua valendo.
+     */
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: urlSupabase.protocol === "http:" ? "http" : "https",

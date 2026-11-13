@@ -22,10 +22,10 @@ export async function Rodape() {
         <div>
           <span className="inline-block rounded-xl bg-(--logo-placa) px-1.5 py-1">
             <Image
-              src="/logo-gale.png"
+              src="/logo-gale.webp"
               alt="Galé Super Atacado — 50 anos de tradição"
-              width={460}
-              height={426}
+              width={276}
+              height={256}
               className="h-20 w-auto"
             />
           </span>

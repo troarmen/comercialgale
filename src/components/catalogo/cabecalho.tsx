@@ -19,10 +19,10 @@ export function MarcaCatalogo({ compacta = false }: { compacta?: boolean }) {
       className="shrink-0 rounded-xl bg-(--logo-placa) px-1.5 py-1 transition hover:opacity-90"
     >
       <Image
-        src="/logo-gale.png"
+        src="/logo-gale.webp"
         alt="Galé Super Atacado — 50 anos de tradição"
-        width={460}
-        height={426}
+        width={276}
+        height={256}
         priority
         className={compacta ? "h-12 w-auto" : "h-14 w-auto sm:h-16"}
       />

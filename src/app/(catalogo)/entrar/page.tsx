@@ -26,7 +26,7 @@ export default async function PaginaEntrar(props: {
   return (
     <div className="mx-auto flex max-w-md flex-col px-4 py-14">
       <div className="text-center">
-        <Image src="/coracao-gale.png" alt="" width={256} height={256} className="mx-auto h-12 w-12" />
+        <Image src="/coracao-gale.webp" alt="" width={128} height={128} className="mx-auto h-12 w-12" />
         <h1 className="mt-3 text-2xl font-bold tracking-tight text-texto">
           Entrar na sua conta
         </h1>

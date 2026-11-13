@@ -149,10 +149,10 @@ export function MenuMovel({ categorias }: { categorias: CategoriaMenu[] }) {
             <div className="flex items-center justify-between border-b border-borda px-4 py-3">
               <span className="rounded-lg bg-(--logo-placa) px-1 py-0.5">
                 <Image
-                  src="/logo-gale.png"
+                  src="/logo-gale.webp"
                   alt="Comercial Galé"
-                  width={460}
-                  height={426}
+                  width={276}
+                  height={256}
                   className="h-12 w-auto"
                 />
               </span>
