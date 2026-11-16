@@ -78,19 +78,41 @@ export function LembrarLista({ chave }: { chave: string }) {
       return (aqui ? `${window.location.pathname}?${aqui}` : window.location.pathname) === endereco;
     };
 
+    // A conferência de URL acima não basta em produção: no teste integrado
+    // (nov/2026) o "rolou para 0" da troca de página ainda chegava com a URL
+    // da lista e a posição 500 virava 0. Por isso o clique que SAI da lista
+    // (fase de captura, antes do Next agir) fotografa a posição e congela a
+    // gravação até a lista desmontar.
+    let saindo = false;
+    const aoClicar = (e: MouseEvent) => {
+      const link = (e.target as Element | null)?.closest?.("a[href]");
+      if (!link) return;
+      gravar(chaveRolagem(chave), String(Math.round(window.scrollY)));
+      saindo = true;
+    };
+
     let quadro = 0;
     const aoRolar = () => {
       cancelAnimationFrame(quadro);
       quadro = requestAnimationFrame(() => {
-        if (aindaNaLista()) {
+        if (!saindo && aindaNaLista()) {
           gravar(chaveRolagem(chave), String(Math.round(window.scrollY)));
         }
       });
     };
+    // Voltar do navegador para a própria lista (filtro, paginação) reabre a
+    // gravação: o efeito só roda de novo se o endereço mudar.
+    const aoVoltarDoHistorico = () => {
+      saindo = false;
+    };
+    document.addEventListener("click", aoClicar, { capture: true });
     window.addEventListener("scroll", aoRolar, { passive: true });
+    window.addEventListener("popstate", aoVoltarDoHistorico);
     return () => {
       cancelAnimationFrame(quadro);
+      document.removeEventListener("click", aoClicar, { capture: true });
       window.removeEventListener("scroll", aoRolar);
+      window.removeEventListener("popstate", aoVoltarDoHistorico);
     };
   }, [chave, endereco]);
 
