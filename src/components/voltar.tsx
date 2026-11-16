@@ -103,11 +103,17 @@ const nadaParaAssinar = () => () => {};
 export function BotaoVoltar({
   chave,
   padrao,
+  destino,
   rotulo = "Voltar",
   className,
 }: {
   chave: string;
   padrao: string;
+  /**
+   * Endereço fixo de volta, quando a tela sabe de onde a pessoa veio (ex.:
+   * pedido aberto pela ficha do cliente). Ignora a lista guardada.
+   */
+  destino?: string;
   rotulo?: string;
   className?: string;
 }) {
@@ -121,13 +127,17 @@ export function BotaoVoltar({
     () => null,
   );
   // só aceita endereço da mesma seção — nunca um link externo
-  const href = guardado && guardado.startsWith(padrao) ? guardado : padrao;
+  const daLista = guardado && guardado.startsWith(padrao) ? guardado : padrao;
+  const href = destino ?? daLista;
 
   return (
     <Link
       href={href}
       scroll={false}
-      onClick={() => gravar(chaveVoltando(chave), href)}
+      onClick={() => {
+        // só a lista devolve a rolagem; a outra tela abre do topo
+        if (!destino) gravar(chaveVoltando(chave), href);
+      }}
       className={
         className ??
         "inline-flex h-9 items-center gap-1.5 rounded-lg border border-borda bg-superficie px-3 text-sm font-medium text-texto transition hover:bg-superficie-2"

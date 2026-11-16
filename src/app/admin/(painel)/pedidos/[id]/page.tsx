@@ -11,10 +11,13 @@ export const metadata: Metadata = { title: "Pedido · Galé Comercial" };
 
 export default async function PaginaPedido({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ de?: string }>;
 }) {
   const { id } = await params;
+  const { de } = await searchParams;
   // O layout do painel já barrou quem não é da equipe. Colaborador vê a
   // ficha inteira e muda a situação, mas não edita anotações nem vínculo e
   // não tem links para seções de admin.
@@ -22,6 +25,10 @@ export default async function PaginaPedido({
   if (!perfil) notFound();
   const { supabase } = perfil;
   const ehAdmin = perfil.papel === "admin";
+  // Aberto pelos "Últimos pedidos" da ficha de um cliente (?de=cliente-12)?
+  // Então o Voltar leva de volta a essa ficha, e não à lista de pedidos.
+  // Só para admin: colaborador não abre ficha de cliente.
+  const deCliente = ehAdmin ? /^cliente-(\d+)$/.exec(de ?? "")?.[1] : undefined;
 
   const { data: pedido } = await supabase
     .from("pedidos")
@@ -56,9 +63,15 @@ export default async function PaginaPedido({
   return (
     <div className="px-8 py-7">
       {/* Voltar devolve a lista com a busca, a aba, a página e a rolagem de
-          antes; a trilha ao lado abre a lista do zero. */}
+          antes (ou a ficha do cliente, se veio de lá); a trilha ao lado abre
+          a lista do zero. */}
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <BotaoVoltar chave="pedidos" padrao="/admin/pedidos" />
+        <BotaoVoltar
+          chave="pedidos"
+          padrao="/admin/pedidos"
+          destino={deCliente && `/admin/clientes/${deCliente}`}
+          rotulo={deCliente ? "Voltar ao cliente" : undefined}
+        />
         <nav className="text-sm text-suave">
           <Link href="/admin/pedidos" className="transition hover:text-texto">
             Pedidos

@@ -107,7 +107,8 @@ export default async function PaginaCliente({
                 {pedidos.map((p) => (
                   <li key={p.id}>
                     <Link
-                      href={`/admin/pedidos/${p.id}`}
+                      // `de`: o Voltar do pedido traz de volta a esta ficha
+                      href={`/admin/pedidos/${p.id}?de=cliente-${cliente.id}`}
                       className="flex items-center justify-between gap-2 px-4 py-2.5 transition hover:bg-superficie-2"
                     >
                       <div className="min-w-0">
