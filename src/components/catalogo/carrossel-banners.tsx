@@ -181,7 +181,10 @@ function Carrossel({
   const comTransicao = animar && !reduzido && arrasto === 0;
 
   function irPara(destino: number) {
-    if (emTransicao.current) return;
+    // Destino = posição atual (pontinho do banner que já está à mostra): o
+    // React não renderiza de novo, não há animação nem `transitionend`, e a
+    // trava `emTransicao` nunca seria solta — o carrossel congelaria.
+    if (emTransicao.current || destino === posicao) return;
     if (reduzido) {
       // Sem animação não há cópia a atravessar: vai direto ao verdadeiro.
       setAnimar(false);
@@ -416,7 +419,7 @@ function Carrossel({
           <button
             key={b.id}
             type="button"
-            onClick={() => irPara(i + 1)}
+            onClick={() => i !== atual && irPara(i + 1)}
             aria-controls={idSlides}
             aria-label={`Mostrar o banner ${i + 1} de ${n}`}
             aria-current={i === atual ? "true" : undefined}
