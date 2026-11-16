@@ -8,6 +8,7 @@ import {
 import { Paginacao } from "@/components/paginacao";
 import { LembrarLista } from "@/components/voltar";
 import { numero } from "@/lib/formato";
+import { dataCurta } from "@/lib/pedidos";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { FiltrosClientes } from "./filtros";
 
@@ -35,25 +36,6 @@ const COLUNAS = {
   cidade: "asc",
   cadastro: "desc",
 } satisfies Record<string, Direcao>;
-
-/*
- * Data de cadastro. `cadastrado_em` é `date` puro ("2019-03-12"): passar por
- * `new Date()` o leria como meia-noite UTC, e em São Paulo isso vira o dia
- * anterior — por isso é só reordenado. `created_at` (o reserva) é um instante
- * e precisa do fuso.
- */
-const DIA_SP = new Intl.DateTimeFormat("pt-BR", {
-  timeZone: "America/Sao_Paulo",
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
-
-function dataCadastro(cadastradoEm: string | null, createdAt: string) {
-  const dia = cadastradoEm?.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (dia) return `${dia[3]}/${dia[2]}/${dia[1]}`;
-  return DIA_SP.format(new Date(createdAt));
-}
 
 export default async function PaginaClientes({
   searchParams,
@@ -239,7 +221,9 @@ export default async function PaginaClientes({
                         {c.cidade ? `${c.cidade}${c.uf ? `/${c.uf}` : ""}` : "—"}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-suave">
-                        {dataCadastro(c.cadastrado_em, c.created_at)}
+                        {/* `cadastrado_em` é a data real (legado ou site); quem
+                            ficou sem ela usa o dia em que a linha entrou. */}
+                        {dataCurta(c.cadastrado_em ?? c.created_at)}
                       </td>
                       <td className="px-4 py-2.5 text-center">
                         {c.user_id ? (
