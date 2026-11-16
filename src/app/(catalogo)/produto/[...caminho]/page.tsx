@@ -13,6 +13,7 @@ import {
   produtosRelacionados,
   slugsPorLegado,
 } from "@/lib/catalogo";
+import { DescricaoFormatada, textoPuro } from "@/lib/descricao";
 import { urlFoto } from "@/lib/formato";
 import { dadosProduto, dadosTrilha, JsonLd } from "@/lib/seo";
 
@@ -45,7 +46,8 @@ export async function generateMetadata(
   const marca = produto.fabricantes?.nome;
   const categoria = produto.categorias?.nome;
   const fotoPrincipal = produto.produto_imagens[0];
-  const resumoDescricao = produto.descricao
+  // Texto puro: os ** do negrito não podem aparecer no resultado do Google.
+  const resumoDescricao = textoPuro(produto.descricao)
     ?.replace(/\s+/g, " ")
     .trim()
     .slice(0, 150);
@@ -190,10 +192,12 @@ export default async function PaginaProduto(
               <h2 id="titulo-descricao" className="text-sm font-semibold uppercase tracking-wider text-tenue">
                 Descrição
               </h2>
-              {/* As quebras de parágrafo vêm do banco como \n\n — pre-line preserva */}
-              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-suave">
-                {produto.descricao}
-              </p>
+              {/* Parágrafos (\n\n), quebras de linha e o negrito (**trecho**) do
+                  painel viram <p>, <br> e <strong> — sem HTML vindo do banco. */}
+              <DescricaoFormatada
+                texto={produto.descricao}
+                className="mt-2 space-y-3 text-sm leading-relaxed text-suave"
+              />
             </section>
           )}
         </div>

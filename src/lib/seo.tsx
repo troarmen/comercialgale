@@ -1,4 +1,5 @@
 import { CONTATO, linkWhatsApp } from "@/lib/contato";
+import { textoPuro } from "@/lib/descricao";
 import type { ItemTrilha } from "@/components/catalogo/trilha";
 
 /**
@@ -91,7 +92,8 @@ export function dadosProduto(produto: {
     name: produto.titulo,
     sku: produto.modelo,
     url: urlCanonica(`/produto/${produto.slug}`),
-    ...(produto.descricao ? { description: produto.descricao } : {}),
+    // Sem os ** do negrito: dado estruturado é texto puro.
+    ...(produto.descricao ? { description: textoPuro(produto.descricao) } : {}),
     ...(produto.fabricante
       ? { brand: { "@type": "Brand", name: produto.fabricante } }
       : {}),
@@ -126,7 +128,14 @@ export function dadosContato() {
 
 export { linkWhatsApp };
 
-/** Injeta um bloco JSON-LD na página. */
+/**
+ * Injeta um bloco JSON-LD na página.
+ *
+ * O `<` vira `\u003c`: JSON.stringify não escapa nada que o HTML enxergue, e
+ * uma descrição com "</script>" fecharia a tag antes da hora e deixaria o
+ * resto do texto ser lido como HTML. Para o leitor de JSON, `\u003c` é o
+ * mesmo caractere.
+ */
 export function JsonLd({ dados }: { dados: object | object[] }) {
   const lista = Array.isArray(dados) ? dados : [dados];
   return (
@@ -135,7 +144,7 @@ export function JsonLd({ dados }: { dados: object | object[] }) {
         <script
           key={i}
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(d) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(d).replace(/</g, "\\u003c") }}
         />
       ))}
     </>
