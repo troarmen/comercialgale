@@ -221,6 +221,15 @@ function traduzir(mensagem: string) {
 
 // --------------------------------------------------------------------- fotos
 
+/** Formato pela assinatura dos primeiros bytes; `null` se não for foto aceita. */
+function formatoDaImagem(b: Uint8Array) {
+  const ascii = (de: number, ate: number) => String.fromCharCode(...b.subarray(de, ate));
+  if (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") return { tipo: "image/webp", extensao: "webp" };
+  if (b[0] === 0x89 && ascii(1, 4) === "PNG") return { tipo: "image/png", extensao: "png" };
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { tipo: "image/jpeg", extensao: "jpg" };
+  return null;
+}
+
 export async function subirFoto(form: FormData): Promise<EstadoProduto> {
   const sessao = await exigirAdmin();
   if (!sessao) return { erro: SEM_PERMISSAO };
@@ -248,17 +257,29 @@ export async function subirFoto(form: FormData): Promise<EstadoProduto> {
     .eq("produto_id", produtoId)
     .order("ordem");
 
+  // O tipo sai dos bytes, não do que o navegador declarou: o painel converte
+  // para WebP antes de enviar, mas um navegador sem WebP no canvas entrega
+  // PNG, e o File diz o que quiser.
+  const conteudo = await arquivo.arrayBuffer();
+  const formato = formatoDaImagem(new Uint8Array(conteudo, 0, Math.min(12, conteudo.byteLength)));
+  if (!formato) return { erro: "O arquivo enviado não é uma imagem WebP, PNG ou JPEG." };
+
   const proximaOrdem = (existentes?.length ?? 0);
   // Nome único: se a foto for trocada, a antiga não fica em cache no navegador.
-  const caminho = `${produto.slug}-${Date.now()}.webp`;
+  const caminho = `${produto.slug}-${Date.now()}.${formato.extensao}`;
 
   // O upload usa a chave mestra porque o bucket não tem política de escrita
   // para o papel `authenticated` — e não queremos abrir isso: assim só o
   // servidor, depois de conferir a sessão, consegue gravar.
+  //
+  // Vai o ArrayBuffer, não o File: com File (ou Blob) o storage-js monta um
+  // multipart e o Storage grava o tipo declarado pelo navegador, ignorando o
+  // `contentType` — foi assim que subiu foto como application/octet-stream.
+  // Com bytes crus, o `contentType` vira o Content-Type da requisição.
   const admin = criarClienteAdmin();
   const { error: erroUp } = await admin.storage
     .from("produtos")
-    .upload(caminho, arquivo, { contentType: "image/webp", upsert: false });
+    .upload(caminho, conteudo, { contentType: formato.tipo, upsert: false });
 
   if (erroUp) return { erro: `Falha no envio: ${erroUp.message}` };
 
