@@ -199,7 +199,7 @@ export default async function PaginaProdutos({
       ordem={ordem}
       primeira={COLUNAS[campo]}
       tipo={tipo}
-      className="px-3"
+      className="px-2"
       caminho="/admin/produtos"
       params={sp}
     />
@@ -268,11 +268,16 @@ export default async function PaginaProdutos({
                     {titulo("modelo", "Ref.")}
                     {titulo("categoria", "Categoria")}
                     {titulo("fabricante", "Fabricante")}
-                    <th scope="col" className="px-3 py-3 text-center font-medium">Kit</th>
-                    <th scope="col" className="px-3 py-3 text-right font-medium">Atacado (kit)</th>
+                    <th scope="col" className="px-2 py-3 text-center font-medium">Kit</th>
+                    <th scope="col" className="px-2 py-3 text-right font-medium">Atacado (kit)</th>
                     {titulo("cadastro", "Cadastro", "data")}
-                    <th scope="col" className="px-2 py-3 text-center font-medium">Lançamento</th>
-                    <th scope="col" className="px-3 py-3 text-center font-medium">Situação</th>
+                    {/* O título é bem mais largo que a caixa da coluna: com o hífen
+                        opcional, ele quebra em "Lança-/mento" só quando falta
+                        espaço (1280 px), em vez de empurrar a tabela. */}
+                    <th scope="col" className="px-1 py-3 text-center font-medium hyphens-manual">
+                      Lança&shy;mento
+                    </th>
+                    <th scope="col" className="px-2 py-3 text-center font-medium">Situação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -289,7 +294,7 @@ export default async function PaginaProdutos({
                         <td className="py-2.5 pl-4 pr-1">
                           <MarcarLinha id={p.id} titulo={p.titulo} />
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-2 py-2.5">
                           <Link
                             href={`/admin/produtos/${p.id}`}
                             className="flex items-center gap-3"
@@ -316,26 +321,31 @@ export default async function PaginaProdutos({
                             </span>
                           </Link>
                         </td>
-                        <td className="px-3 py-2.5 tabular-nums text-suave">
+                        <td className="px-2 py-2.5 tabular-nums text-suave">
                           {/* Quase toda referência é curta ("MF 307"); as ~45
                               longas ("1447 (P) / 1454 (M) / 1461 (G)") quebram
                               linha em vez de alargar a tabela inteira. */}
                           <span className="block max-w-36">{p.modelo}</span>
                         </td>
-                        <td className="px-3 py-2.5 text-suave">
+                        <td className="px-2 py-2.5 text-suave">
                           <div className="text-texto">{p.categorias?.nome}</div>
                           {p.subcategorias?.nome && (
                             <div className="text-xs">{p.subcategorias.nome}</div>
                           )}
                         </td>
-                        <td className="px-3 py-2.5 text-suave">
+                        <td className="px-2 py-2.5 text-suave">
                           {p.fabricantes?.nome ?? "—"}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-center tabular-nums text-suave">
-                          {p.kits?.pecas}{" "}
-                          {p.kits?.pecas === 1 ? "peça" : "peças"}
+                        {/* Número em cima, unidade embaixo (como o preço e o
+                            "/peça" ao lado): a coluna fica estreita e igual em
+                            todas as linhas, e a tabela cabe em 1280 px. */}
+                        <td className="px-2 py-2.5 text-center tabular-nums text-suave">
+                          <div>{p.kits?.pecas}</div>
+                          <div className="text-xs">
+                            {p.kits?.pecas === 1 ? "peça" : "peças"}
+                          </div>
                         </td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">
+                        <td className="px-2 py-2.5 text-right tabular-nums">
                           <div className="font-medium text-texto">
                             {preco ? faixaPreco(preco.min, preco.max) : "—"}
                           </div>
@@ -352,7 +362,7 @@ export default async function PaginaProdutos({
                             </div>
                           )}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-suave">
+                        <td className="whitespace-nowrap px-2 py-2.5 tabular-nums text-suave">
                           {DATA.format(new Date(p.created_at))}
                         </td>
                         <td className="px-2 py-1 text-center">
@@ -362,7 +372,7 @@ export default async function PaginaProdutos({
                             titulo={p.titulo}
                           />
                         </td>
-                        <td className="px-3 py-2.5 text-center">
+                        <td className="px-2 py-2.5 text-center">
                           <span
                             className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${
                               p.ativo
