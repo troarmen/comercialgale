@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import {
   Aviso,
   BotaoCancelar,
@@ -10,6 +10,7 @@ import {
   EtiquetaAtivo,
   Interruptor,
   Modal,
+  useEnvio,
 } from "@/components/cadastro-ui";
 import { alternarKit, excluirKit, salvarKit, type EstadoKit } from "./acoes";
 
@@ -23,7 +24,9 @@ export type Kit = {
 };
 
 function Formulario({ kit, aoFechar }: { kit: Kit | "novo"; aoFechar: () => void }) {
-  const [estado, acao] = useActionState<EstadoKit, FormData>(salvarKit, {});
+  // onSubmit em vez de `<form action>`: com erro (kit repetido, por exemplo),
+  // o reset do React 19 apagava o que tinha sido digitado. Ver useEnvio.
+  const [estado, aoEnviar, salvando] = useEnvio<EstadoKit>(salvarKit, {});
   const editando = kit !== "novo";
 
   return (
@@ -32,7 +35,7 @@ function Formulario({ kit, aoFechar }: { kit: Kit | "novo"; aoFechar: () => void
       aoFechar={aoFechar}
       fecharQuando={!!estado.ok}
     >
-      <form action={acao} className="flex flex-col gap-4">
+      <form onSubmit={aoEnviar} className="flex flex-col gap-4">
         {editando && <input type="hidden" name="id" value={kit.id} />}
 
         <label className="flex w-40 flex-col gap-1.5">
@@ -73,7 +76,7 @@ function Formulario({ kit, aoFechar }: { kit: Kit | "novo"; aoFechar: () => void
 
         <div className="mt-1 flex items-center justify-end gap-2">
           <BotaoCancelar aoClicar={aoFechar} />
-          <BotaoSalvar />
+          <BotaoSalvar salvando={salvando} />
         </div>
       </form>
     </Modal>

@@ -1,21 +1,71 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { startTransition, useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 
 /** Estilo único dos campos das telas de cadastro. */
 export const CAMPO =
   "h-10 w-full rounded-lg border border-borda bg-superficie px-3 text-sm text-texto outline-none transition placeholder:text-tenue focus:border-gale-500";
 
-export function BotaoSalvar({ rotulo = "Salvar" }: { rotulo?: string }) {
+/**
+ * Liga um formulário a uma Server Action SEM o reset automático do React 19.
+ *
+ * Com `<form action={...}>`, o React limpa o formulário assim que a action
+ * termina — com sucesso e também quando ela devolve erro. Limpar, ali, é
+ * voltar cada campo ao valor com que a TELA ABRIU, não ao que acabou de ser
+ * gravado: um <select> não controlado volta à opção antiga e um <select>
+ * controlado volta à primeira opção ("Escolha…"). Foi assim que o produto
+ * "perdia" a categoria e o kit ao salvar (relatório do cliente, nov/2026), e
+ * o fabricante trocado voltava ao anterior na tela — um segundo Salvar
+ * gravaria o valor velho por cima. Com erro, o reset apagava o que a pessoa
+ * tinha acabado de digitar.
+ *
+ * Aqui o envio passa pelo onSubmit: o navegador continua validando os campos
+ * `required` antes, nós montamos o FormData e chamamos a action dentro de uma
+ * transição. Sem `action` no <form>, o React não tem o que resetar. O
+ * useFormStatus do BotaoSalvar segue acendendo "Salvando…" (o React marca o
+ * formulário como pendente quando o onSubmit abre uma transição), e o
+ * `pendente` devolvido aqui cobre quem preferir passar o estado à mão.
+ *
+ * Uso: `const [estado, aoEnviar, pendente] = useEnvio(acao, {});`
+ *      `<form onSubmit={aoEnviar}>`
+ */
+export function useEnvio<E>(
+  acao: (anterior: E, form: FormData) => Promise<E>,
+  inicial: E,
+) {
+  const [estado, despachar, pendente] = useActionState<E, FormData>(
+    acao as (anterior: Awaited<E>, form: FormData) => Promise<E>,
+    inicial as Awaited<E>,
+  );
+
+  function aoEnviar(evento: React.FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    if (pendente) return; // duplo Enter não grava duas vezes
+    const dados = new FormData(evento.currentTarget);
+    startTransition(() => despachar(dados));
+  }
+
+  return [estado, aoEnviar, pendente] as const;
+}
+
+export function BotaoSalvar({
+  rotulo = "Salvar",
+  salvando = false,
+}: {
+  rotulo?: string;
+  /** Estado de envio vindo de `useEnvio`, para não depender só do formulário. */
+  salvando?: boolean;
+}) {
   const { pending } = useFormStatus();
+  const ocupado = pending || salvando;
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={ocupado}
       className="h-10 rounded-lg bg-acento px-5 text-sm font-semibold text-white transition hover:bg-acento-forte disabled:opacity-60"
     >
-      {pending ? "Salvando…" : rotulo}
+      {ocupado ? "Salvando…" : rotulo}
     </button>
   );
 }

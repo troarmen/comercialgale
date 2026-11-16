@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { useEnvio } from "@/components/cadastro-ui";
 import {
   alternarAtivo,
   excluirFabricante,
@@ -21,15 +22,16 @@ export type Fabricante = {
 const CAMPO =
   "h-10 w-full rounded-lg border border-borda bg-superficie px-3 text-sm text-texto outline-none transition placeholder:text-tenue focus:border-gale-500";
 
-function Confirmar() {
+function Confirmar({ salvando }: { salvando: boolean }) {
   const { pending } = useFormStatus();
+  const ocupado = pending || salvando;
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={ocupado}
       className="h-10 rounded-lg bg-acento px-5 text-sm font-semibold text-white transition hover:bg-acento-forte disabled:opacity-60"
     >
-      {pending ? "Salvando…" : "Salvar"}
+      {ocupado ? "Salvando…" : "Salvar"}
     </button>
   );
 }
@@ -41,10 +43,9 @@ function Dialogo({
   fabricante: Fabricante | "novo";
   aoFechar: () => void;
 }) {
-  const [estado, acao] = useActionState<EstadoFabricante, FormData>(
-    salvarFabricante,
-    {},
-  );
+  // onSubmit em vez de `<form action>`: com erro (nome repetido, por exemplo),
+  // o reset do React 19 apagava o que tinha sido digitado. Ver useEnvio.
+  const [estado, aoEnviar, salvando] = useEnvio<EstadoFabricante>(salvarFabricante, {});
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -64,7 +65,7 @@ function Dialogo({
       onClose={aoFechar}
       className="m-auto w-[min(30rem,calc(100vw-2rem))] rounded-2xl bg-superficie p-0 text-texto backdrop:bg-black/50"
     >
-      <form action={acao} className="flex flex-col gap-4 p-6">
+      <form onSubmit={aoEnviar} className="flex flex-col gap-4 p-6">
         <h2 className="text-lg font-semibold">
           {editando ? "Editar fabricante" : "Novo fabricante"}
         </h2>
@@ -122,7 +123,7 @@ function Dialogo({
           >
             Cancelar
           </button>
-          <Confirmar />
+          <Confirmar salvando={salvando} />
         </div>
       </form>
     </dialog>

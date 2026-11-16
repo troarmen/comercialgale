@@ -1,7 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
-import { Aviso, BotaoSalvar, CAMPO, Interruptor } from "@/components/cadastro-ui";
+import { Aviso, BotaoSalvar, CAMPO, Interruptor, useEnvio } from "@/components/cadastro-ui";
 import type { Resultado } from "./acoes";
 
 export type DadosCliente = {
@@ -76,10 +75,13 @@ export function FormularioCliente({
   aoSalvar: (anterior: Resultado, form: FormData) => Promise<Resultado>;
   rotulo?: string;
 }) {
-  const [estado, acao] = useActionState<Resultado, FormData>(aoSalvar, {});
+  // Sem `<form action>`: o reset do React 19 devolvia Tipo e Situação ao valor
+  // com que a tela abriu (um segundo Salvar regravaria o antigo) e, com erro,
+  // apagava o que tinha sido digitado. Ver useEnvio.
+  const [estado, aoEnviar, salvando] = useEnvio<Resultado>(aoSalvar, {});
 
   return (
-    <form action={acao} className="space-y-4">
+    <form onSubmit={aoEnviar} className="space-y-4">
       {c.id > 0 && <input type="hidden" name="id" value={c.id} />}
 
       <Secao titulo="Identificação">
@@ -156,7 +158,7 @@ export function FormularioCliente({
       {estado.erro && <Aviso mensagem={estado.erro} />}
 
       <div className="flex items-center gap-3">
-        <BotaoSalvar rotulo={rotulo} />
+        <BotaoSalvar rotulo={rotulo} salvando={salvando} />
         {estado.ok && (
           <span role="status" className="text-sm font-medium text-ok-texto">
             Salvo.
