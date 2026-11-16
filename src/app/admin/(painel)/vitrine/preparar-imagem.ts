@@ -24,6 +24,11 @@ export type ImagemPreparada = {
   larguraOriginal: number;
   alturaOriginal: number;
   pesoOriginal: number;
+  /**
+   * Tipo do arquivo ESCOLHIDO (o `arquivo` já sai convertido, quase sempre
+   * em WebP). É o que diz se o original tinha como ter transparência.
+   */
+  tipoOriginal: string;
   /** A proporção original era outra e o centro foi recortado. */
   recortada: boolean;
   /** Menor que o recomendado: vai aparecer esticada em tela grande. */
@@ -78,6 +83,7 @@ async function finalizar(
     larguraOriginal: bitmap.width,
     alturaOriginal: bitmap.height,
     pesoOriginal: original.size,
+    tipoOriginal: original.type,
     ...extra,
   };
 }

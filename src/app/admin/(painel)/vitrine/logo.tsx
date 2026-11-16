@@ -158,7 +158,9 @@ export function EditorLogo({ atual }: { atual: LogoLoja }) {
           pequeno. Um logo mais quadrado (ou em duas linhas) fica mais legível.
         </p>
       )}
-      {novo?.arquivo.type === "image/jpeg" && (
+      {/* JPEG não guarda transparência. Testa o ORIGINAL: o arquivo que sobe
+          já foi convertido para WebP e nunca é JPEG. */}
+      {novo?.tipoOriginal === "image/jpeg" && (
         <p className="mt-1 text-xs text-alerta-texto">
           Este arquivo não tem transparência: o fundo dele aparece como um
           retângulo no cabeçalho. Se puder, envie em PNG.
