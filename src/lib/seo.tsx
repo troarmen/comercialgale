@@ -93,7 +93,9 @@ export function dadosProduto(produto: {
     sku: produto.modelo,
     url: urlCanonica(`/produto/${produto.slug}`),
     // Sem os ** do negrito: dado estruturado é texto puro.
-    ...(produto.descricao ? { description: textoPuro(produto.descricao) } : {}),
+    ...(textoPuro(produto.descricao)?.trim()
+      ? { description: textoPuro(produto.descricao) }
+      : {}),
     ...(produto.fabricante
       ? { brand: { "@type": "Brand", name: produto.fabricante } }
       : {}),

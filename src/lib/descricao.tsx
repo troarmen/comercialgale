@@ -20,7 +20,8 @@ import { Fragment, type ReactNode } from "react";
  *   • linha em branco (\n\n) separa parágrafos; \n simples é quebra de linha;
  *   • **trecho** vira <strong>; o negrito não atravessa quebra de linha (o
  *     botão do editor fecha e reabre o ** em cada linha da seleção);
- *   • ** sem par fica como está — aparece na prévia, e o Arthur corrige.
+ *   • ** sem par fica como está — aparece na prévia, e o Arthur corrige;
+ *     o par vazio (****) some.
  */
 
 const MARCA = "**";
@@ -52,6 +53,10 @@ export function trechos(linha: string): Trecho[] {
 /** Parágrafos (separados por linha em branco), cada um com suas linhas. */
 export function paragrafos(descricao: string): string[][] {
   return descricao
+    // "****" é o par vazio que o botão deixa quando ninguém digita no meio:
+    // some, em vez de aparecer como quatro asteriscos na loja.
+    .split(MARCA + MARCA)
+    .join("")
     .replace(/\r\n?/g, "\n")
     .split(/\n[ \t]*\n+/)
     .map((p) => p.split("\n").map((l) => l.trim()).filter(Boolean))
@@ -176,9 +181,26 @@ export function alternarNegrito(texto: string, ini: number, fim: number): TrocaN
     }
   }
 
-  // 4) Põe o negrito. Marcas soltas dentro da seleção saem antes, para não
+  // 4) Várias linhas, todas já em negrito: tira o negrito de todas.
+  const cheias = sel.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (cheias.length > 1 && cheias.every((l) => /^\*\*(.+?)\*\*$/.test(l) && !l.slice(2, -2).includes(MARCA))) {
+    const miolo = sel.split(MARCA).join("");
+    return { inicio: ini, fim, trecho: miolo, selInicio: ini, selFim: ini + miolo.length };
+  }
+
+  // 5) Seleção que corta um negrito no meio ("c **de" em "abc **def**"):
+  // estica até o fim do negrito cortado, senão sobraria um ** sem par.
+  for (const m of texto.matchAll(NEGRITO)) {
+    const a = m.index;
+    const b = a + m[0].length;
+    if (a < ini && ini < b) ini = a;
+    if (a < fim && fim < b) fim = b;
+  }
+  const marcado = texto.slice(ini, fim);
+
+  // 6) Põe o negrito. Marcas soltas dentro da seleção saem antes, para não
   // aninhar; cada linha ganha o seu par.
-  const limpo = sel.split(MARCA).join("");
+  const limpo = marcado.split(MARCA).join("");
   const trecho = limpo
     .split("\n")
     .map((linha) => {

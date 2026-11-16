@@ -187,7 +187,8 @@ export default async function PaginaProduto(
             />
           </div>
 
-          {produto.descricao && (
+          {/* Só marcas de negrito, sem texto ("****"), não abre a seção vazia. */}
+          {produto.descricao && textoPuro(produto.descricao).trim() && (
             <section className="mt-6" aria-labelledby="titulo-descricao">
               <h2 id="titulo-descricao" className="text-sm font-semibold uppercase tracking-wider text-tenue">
                 Descrição
