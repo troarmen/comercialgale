@@ -1,24 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { startTransition, useActionState, useState } from "react";
 import { salvarConfiguracoes, type EstadoConfig } from "./acoes";
 
 const CAMPO =
   "h-10 w-full rounded-lg border border-borda bg-superficie px-3 text-sm text-texto outline-none transition placeholder:text-tenue focus:border-gale-500";
-
-function Salvar() {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="h-10 rounded-lg bg-acento px-5 text-sm font-semibold text-white transition hover:bg-acento-forte disabled:opacity-60"
-    >
-      {pending ? "Salvando…" : "Salvar alterações"}
-    </button>
-  );
-}
 
 function Secao({
   titulo,
@@ -40,28 +26,79 @@ function Secao({
   );
 }
 
+/**
+ * Chave liga/desliga. A bolinha anda pelo `[&>span]`: `peer-checked:` só
+ * enxerga IRMÃOS do input, e a bolinha é filha do trilho — com a classe nela
+ * direto (como estava), o trilho mudava de cor e a bolinha ficava parada.
+ */
+function Interruptor({
+  nome,
+  ligado,
+  rotulo,
+}: {
+  nome: string;
+  ligado: boolean;
+  rotulo: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3">
+      <input type="checkbox" name={nome} defaultChecked={ligado} className="peer sr-only" />
+      <span className="relative h-6 w-11 shrink-0 rounded-full bg-borda-forte transition peer-checked:bg-acento peer-checked:[&>span]:translate-x-5 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-gale-500">
+        <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition" />
+      </span>
+      <span className="text-sm text-texto">{rotulo}</span>
+    </label>
+  );
+}
+
 export function FormularioConfiguracoes({
   minimo,
   emails,
   aviso,
   exibirVarejo,
+  cadastroAutomatico,
 }: {
   minimo: number;
   emails: string[];
   aviso: string;
   exibirVarejo: boolean;
+  cadastroAutomatico: boolean;
 }) {
-  const [estado, acao] = useActionState<EstadoConfig, FormData>(
+  const [estado, acao, salvando] = useActionState<EstadoConfig, FormData>(
     salvarConfiguracoes,
     {},
   );
   const [contador, setContador] = useState(aviso.length);
 
   return (
-    <form action={acao} className="flex max-w-3xl flex-col gap-4">
+    <form
+      action={acao}
+      // O React 19 devolve todo campo ao valor inicial depois de uma action
+      // passada em `action` — também quando ela volta com ERRO: um e-mail
+      // digitado errado sumia junto com a mensagem, e o contador do aviso
+      // ficava descolado do texto. Interceptando o submit e chamando a action
+      // numa transição, o que foi digitado fica onde está.
+      onSubmit={(e) => {
+        e.preventDefault();
+        const dados = new FormData(e.currentTarget);
+        startTransition(() => acao(dados));
+      }}
+      className="flex max-w-3xl flex-col gap-4"
+    >
+      <Secao
+        titulo="Cadastro de lojistas"
+        descricao="Ligado, quem se cadastra pelo site cria a senha e já entra vendo os preços — vocês recebem o aviso por e-mail e podem suspender na ficha. Desligado, o lojista cria login e senha do mesmo jeito, mas só vê preço depois que alguém mudar a situação dele para Ativo na ficha."
+      >
+        <Interruptor
+          nome="cadastro_aprovacao_automatica"
+          ligado={cadastroAutomatico}
+          rotulo="Liberar cadastro automaticamente"
+        />
+      </Secao>
+
       <Secao
         titulo="Pedido mínimo"
-        descricao="Valor abaixo do qual o cliente não consegue fechar o pedido. Deixe em branco ou zero para não exigir mínimo."
+        descricao="Valor de referência das compras no atacado. Abaixo dele o carrinho mostra um aviso, mas o pedido fecha normalmente. Deixe em branco ou zero para não mostrar aviso."
       >
         <div className="relative w-48">
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-suave">
@@ -79,37 +116,28 @@ export function FormularioConfiguracoes({
       </Secao>
 
       <Secao
-        titulo="Aviso para os pedidos"
-        descricao="Quem recebe uma cópia por e-mail a cada pedido novo. Um endereço por linha. O cliente que fez o pedido também recebe, sempre."
+        titulo="Avisos por e-mail"
+        descricao="Quem recebe uma cópia de cada pedido novo e o aviso de cada cadastro novo. Um endereço por linha. O cliente que fez o pedido também recebe a confirmação, sempre."
       >
         <textarea
           name="emails_notificacao"
           defaultValue={emails.join("\n")}
           rows={3}
           placeholder="contato@comercialgale.com.br"
-          aria-label="E-mails que recebem cópia dos pedidos"
+          aria-label="E-mails que recebem cópia dos pedidos e aviso de cadastro"
           className={`${CAMPO} h-auto py-2.5 font-mono text-[13px] leading-relaxed`}
         />
       </Secao>
 
       <Secao
-        titulo="Preço de revenda sugerido"
-        descricao="Mostra ao lojista, ao lado do preço de atacado, por quanto ele pode revender a peça. Desligar esconde essa coluna do catálogo — os pedidos antigos continuam guardando o valor."
+        titulo="Preço de Varejo"
+        descricao="Mostra ao lojista, ao lado do preço de Atacado, o preço de revenda ao consumidor. Desligar esconde o Varejo do catálogo e do e-mail de confirmação do lojista — a cópia da casa e os pedidos antigos continuam guardando o valor."
       >
-        <label className="flex cursor-pointer items-center gap-3">
-          <input
-            type="checkbox"
-            name="exibir_preco_varejo"
-            defaultChecked={exibirVarejo}
-            className="peer sr-only"
-          />
-          <span className="relative h-6 w-11 rounded-full bg-borda-forte transition peer-checked:bg-acento peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-gale-500">
-            <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition peer-checked:translate-x-5" />
-          </span>
-          <span className="text-sm text-texto">
-            Exibir preço de revenda no catálogo
-          </span>
-        </label>
+        <Interruptor
+          nome="exibir_preco_varejo"
+          ligado={exibirVarejo}
+          rotulo="Exibir preço de Varejo no catálogo"
+        />
       </Secao>
 
       <Secao
@@ -132,13 +160,19 @@ export function FormularioConfiguracoes({
       </Secao>
 
       <div className="flex items-center gap-3">
-        <Salvar />
-        {estado.ok && (
+        <button
+          type="submit"
+          disabled={salvando}
+          className="h-10 rounded-lg bg-acento px-5 text-sm font-semibold text-white transition hover:bg-acento-forte disabled:opacity-60"
+        >
+          {salvando ? "Salvando…" : "Salvar alterações"}
+        </button>
+        {!salvando && estado.ok && (
           <span role="status" className="text-sm font-medium text-ok-texto">
             Alterações salvas.
           </span>
         )}
-        {estado.erro && (
+        {!salvando && estado.erro && (
           <span role="alert" className="text-sm font-medium text-acento-texto">
             {estado.erro}
           </span>
