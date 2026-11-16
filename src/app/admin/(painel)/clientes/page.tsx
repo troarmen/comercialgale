@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  CabecalhoOrdenavel,
+  lerOrdem,
+  type Direcao,
+} from "@/components/cabecalho-ordenavel";
 import { Paginacao } from "@/components/paginacao";
+import { LembrarLista } from "@/components/voltar";
 import { numero } from "@/lib/formato";
+import { dataCurta } from "@/lib/pedidos";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { FiltrosClientes } from "./filtros";
 
@@ -19,6 +26,17 @@ const SITUACAO = {
   inativo: { nome: "Inativo", cor: "bg-tenue/15 text-suave", ponto: "bg-tenue" },
 } as const;
 
+/*
+ * Colunas que ordenam a lista e a direção do primeiro clique. "Cadastro"
+ * começa pelos mais novos: o pedido do cliente (nov/2026) foi justamente "ver
+ * os últimos clientes cadastrados".
+ */
+const COLUNAS = {
+  nome: "asc",
+  cidade: "asc",
+  cadastro: "desc",
+} satisfies Record<string, Direcao>;
+
 export default async function PaginaClientes({
   searchParams,
 }: {
@@ -27,19 +45,22 @@ export default async function PaginaClientes({
     status?: string;
     acesso?: string;
     tipo?: string;
+    ordem?: string;
+    dir?: string;
     pagina?: string;
   }>;
 }) {
   const sp = await searchParams;
   const pagina = Math.max(1, Number(sp.pagina) || 1);
   const de = (pagina - 1) * POR_PAGINA;
+  const ordem = lerOrdem(sp, COLUNAS, { campo: "nome", dir: "asc" });
 
   const supabase = await criarClienteServidor();
 
   let consulta = supabase
     .from("clientes")
     .select(
-      "id, nome, nome_fantasia, documento, email, telefone1, cidade, uf, status, tipo_pessoa, user_id, pode_ver_precos",
+      "id, nome, nome_fantasia, documento, email, telefone1, cidade, uf, status, tipo_pessoa, user_id, pode_ver_precos, cadastrado_em, created_at",
       { count: "exact" },
     );
 
@@ -59,8 +80,28 @@ export default async function PaginaClientes({
   if (sp.acesso === "com") consulta = consulta.not("user_id", "is", null);
   if (sp.acesso === "sem") consulta = consulta.is("user_id", null);
 
+  const asc = ordem.dir === "asc";
+  if (ordem.campo === "cadastro") {
+    // Cliente sem `cadastrado_em` é cadastro recente feito pelo site (a 004
+    // preencheu todos os antigos; a 010 preenche estes e põe valor padrão).
+    // Enquanto a 010 não roda, eles precisam vir PRIMEIRO em "mais novos" e
+    // por último em "mais antigos" — e, entre eles, `created_at` decide.
+    consulta = consulta
+      .order("cadastrado_em", { ascending: asc, nullsFirst: !asc })
+      .order("created_at", { ascending: asc });
+  } else if (ordem.campo === "cidade") {
+    consulta = consulta
+      .order("cidade", { ascending: asc, nullsFirst: false })
+      .order("uf", { ascending: asc, nullsFirst: false })
+      .order("nome");
+  } else {
+    consulta = consulta.order("nome", { ascending: asc });
+  }
+
+  // `id` no fim: com nomes ou datas empatados, nenhum cliente aparece em
+  // duas páginas nem some entre elas.
   const { data, count } = await consulta
-    .order("nome")
+    .order("id", { ascending: asc })
     .range(de, de + POR_PAGINA - 1);
 
   const lista = data ?? [];
@@ -73,8 +114,28 @@ export default async function PaginaClientes({
     .is("user_id", null)
     .eq("status", "ativo");
 
+  const titulo = (
+    campo: keyof typeof COLUNAS,
+    rotulo: string,
+    tipo?: "data",
+  ) => (
+    <CabecalhoOrdenavel
+      campo={campo}
+      rotulo={rotulo}
+      ordem={ordem}
+      primeira={COLUNAS[campo]}
+      tipo={tipo}
+      caminho="/admin/clientes"
+      params={sp}
+    />
+  );
+
   return (
     <div className="px-8 py-7">
+      {/* Guarda busca, filtros, ordem, página e rolagem para o Voltar da
+          ficha do cliente devolver a lista como estava. */}
+      <LembrarLista chave="clientes" />
+
       <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-texto">
@@ -122,11 +183,12 @@ export default async function PaginaClientes({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-borda text-left text-xs uppercase tracking-wide text-tenue">
-                  <th className="px-4 py-3 font-medium">Cliente</th>
-                  <th className="px-4 py-3 font-medium">Contato</th>
-                  <th className="px-4 py-3 font-medium">Cidade</th>
-                  <th className="px-4 py-3 text-center font-medium">Acesso</th>
-                  <th className="px-4 py-3 text-center font-medium">Situação</th>
+                  {titulo("nome", "Cliente")}
+                  <th scope="col" className="px-4 py-3 font-medium">Contato</th>
+                  {titulo("cidade", "Cidade")}
+                  {titulo("cadastro", "Cadastro", "data")}
+                  <th scope="col" className="px-4 py-3 text-center font-medium">Acesso</th>
+                  <th scope="col" className="px-4 py-3 text-center font-medium">Situação</th>
                 </tr>
               </thead>
               <tbody>
@@ -157,6 +219,11 @@ export default async function PaginaClientes({
                       </td>
                       <td className="px-4 py-2.5 text-suave">
                         {c.cidade ? `${c.cidade}${c.uf ? `/${c.uf}` : ""}` : "—"}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-suave">
+                        {/* `cadastrado_em` é a data real (legado ou site); quem
+                            ficou sem ela usa o dia em que a linha entrou. */}
+                        {dataCurta(c.cadastrado_em ?? c.created_at)}
                       </td>
                       <td className="px-4 py-2.5 text-center">
                         {c.user_id ? (

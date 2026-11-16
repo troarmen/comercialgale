@@ -65,9 +65,28 @@ export const ORDEM_STATUS: StatusPedido[] = [
   "cancelado",
 ];
 
+const DIA_SP = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
+/**
+ * dd/mm/aaaa. Aceita os dois tipos que o banco devolve:
+ *   • data pura ("2021-04-20", coluna `date`, como `clientes.cadastrado_em`):
+ *     não tem fuso, então é só reordenada. Passar por `new Date()` a leria
+ *     como meia-noite UTC, que em São Paulo é o dia ANTERIOR — a ficha do
+ *     cliente dizia 19/04 e a lista 20/04;
+ *   • instante ("2026-11-16T01:30:00+00:00", `timestamptz`): mostrado no dia
+ *     de São Paulo. Sem o fuso, o servidor (UTC na Vercel) daria o dia
+ *     seguinte para o que aconteceu depois das 21h.
+ */
 export function dataCurta(iso: string | null) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("pt-BR");
+  const dia = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (dia) return `${dia[3]}/${dia[2]}/${dia[1]}`;
+  return DIA_SP.format(new Date(iso));
 }
 
 export function dataHora(iso: string | null) {

@@ -68,12 +68,24 @@ export function LembrarLista({ chave }: { chave: string }) {
       }
     }
 
+    // Ao abrir uma ficha, o Next troca a página e a leva ao topo ANTES de esta
+    // lista desmontar e soltar o ouvinte: sem esta conferência, aquele último
+    // "rolou para 0" sobrescrevia a posição verdadeira e o Voltar caía no
+    // topo (visto no teste: rolagem 569 guardada como 0). O endereço já é o
+    // da ficha nesse momento, então só grava enquanto a URL for a da lista.
+    const aindaNaLista = () => {
+      const aqui = new URLSearchParams(window.location.search).toString();
+      return (aqui ? `${window.location.pathname}?${aqui}` : window.location.pathname) === endereco;
+    };
+
     let quadro = 0;
     const aoRolar = () => {
       cancelAnimationFrame(quadro);
-      quadro = requestAnimationFrame(() =>
-        gravar(chaveRolagem(chave), String(Math.round(window.scrollY))),
-      );
+      quadro = requestAnimationFrame(() => {
+        if (aindaNaLista()) {
+          gravar(chaveRolagem(chave), String(Math.round(window.scrollY)));
+        }
+      });
     };
     window.addEventListener("scroll", aoRolar, { passive: true });
     return () => {
@@ -91,11 +103,17 @@ const nadaParaAssinar = () => () => {};
 export function BotaoVoltar({
   chave,
   padrao,
+  destino,
   rotulo = "Voltar",
   className,
 }: {
   chave: string;
   padrao: string;
+  /**
+   * Endereço fixo de volta, quando a tela sabe de onde a pessoa veio (ex.:
+   * pedido aberto pela ficha do cliente). Ignora a lista guardada.
+   */
+  destino?: string;
   rotulo?: string;
   className?: string;
 }) {
@@ -109,13 +127,17 @@ export function BotaoVoltar({
     () => null,
   );
   // só aceita endereço da mesma seção — nunca um link externo
-  const href = guardado && guardado.startsWith(padrao) ? guardado : padrao;
+  const daLista = guardado && guardado.startsWith(padrao) ? guardado : padrao;
+  const href = destino ?? daLista;
 
   return (
     <Link
       href={href}
       scroll={false}
-      onClick={() => gravar(chaveVoltando(chave), href)}
+      onClick={() => {
+        // só a lista devolve a rolagem; a outra tela abre do topo
+        if (!destino) gravar(chaveVoltando(chave), href);
+      }}
       className={
         className ??
         "inline-flex h-9 items-center gap-1.5 rounded-lg border border-borda bg-superficie px-3 text-sm font-medium text-texto transition hover:bg-superficie-2"
