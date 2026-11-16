@@ -2,9 +2,10 @@ import nodemailer from "nodemailer";
 import { CONTATO } from "@/lib/contato";
 import { reais } from "@/lib/formato";
 import { criarClienteAdmin } from "@/lib/supabase/server";
+import { formatarDocumento } from "@/lib/validacao";
 
 /**
- * E-mail transacional do catálogo (confirmação de pedido).
+ * E-mail transacional do catálogo (pedido, cadastro, links de senha).
  *
  * Transporte por SMTP simples, configurado por variável de ambiente:
  *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_SENHA (os dois últimos opcionais —
@@ -52,52 +53,396 @@ function transporte() {
   });
 }
 
-export type PedidoParaEmail = {
-  numero: string;
-  clienteNome: string;
-  clienteEmail: string | null;
-  observacoes: string | null;
-  itens: {
-    titulo: string;
-    modelo: string;
-    tamanho: string | null;
-    pecasNoKit: number;
-    qtdKits: number;
-    precoKit: number;
-  }[];
-  totalAtacado: number;
-  totalPecas: number;
-};
-
-function corpoTexto(pedido: PedidoParaEmail, paraLojista: boolean) {
-  const linhas = pedido.itens
-    .map(
-      (i) =>
-        `• ${i.titulo} (ref. ${i.modelo})${i.tamanho ? ` · tam. ${i.tamanho}` : ""} — ${i.qtdKits} ${i.qtdKits === 1 ? "embalagem" : "embalagens"} de ${i.pecasNoKit} ${i.pecasNoKit === 1 ? "peça" : "peças"} × ${reais(i.precoKit)} = ${reais(i.qtdKits * i.precoKit)}`,
-    )
-    .join("\n");
-
-  const cabecalho = paraLojista
-    ? `Olá, ${pedido.clienteNome}!\n\nRecebemos o seu pedido nº ${pedido.numero}. Nossa equipe entra em contato para combinar pagamento e envio — nada é cobrado pelo site.`
-    : `Novo pedido nº ${pedido.numero} de ${pedido.clienteNome}.`;
-
-  return `${cabecalho}
-
-Itens:
-${linhas}
-
-Total de peças: ${pedido.totalPecas}
-Total Atacado: ${reais(pedido.totalAtacado)}
-${pedido.observacoes ? `\nObservações do cliente:\n${pedido.observacoes}\n` : ""}
-—
-${CONTATO.nome} · ${CONTATO.endereco.logradouro}, ${CONTATO.endereco.bairro} — ${CONTATO.endereco.cidade}/${CONTATO.endereco.uf}
-WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}`;
+function remetente() {
+  return process.env.EMAIL_REMETENTE ?? `Comercial Galé <${CONTATO.email}>`;
 }
 
-/** Dispara a confirmação para o cliente e a cópia para a casa. */
+// ------------------------------------------------------------ HTML de e-mail
+//
+// Regras de HTML de e-mail, que não são as da web: o Outlook do Windows
+// desenha com o motor do Word (sem flex, sem grid, sem max-width, sem CSS
+// externo) e o Gmail descarta <style> em vários cenários. Por isso: layout em
+// <table>, TODO estilo inline, largura travada em 640px por um comentário
+// condicional só do Outlook, cores repetidas em `bgcolor`. E todo texto que
+// vem do banco ou do formulário passa por esc() — nome de loja com "<" ou
+// observação com HTML colado não pode virar marcação no e-mail da casa.
+
+const COR = {
+  marca: "#d12437",
+  texto: "#1f2328",
+  suave: "#5b6470",
+  tenue: "#8a929c",
+  borda: "#e3e7ec",
+  fundo: "#f6f7f9",
+  cabecalho: "#f1f3f5",
+  destaque: "#fef2f3",
+};
+const FONTE = "Arial, Helvetica, sans-serif";
+
+function esc(valor: unknown) {
+  return String(valor ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Texto do usuário com as quebras de linha preservadas (observações). */
+function escMultilinha(valor: string) {
+  return esc(valor).replace(/\r?\n/g, "<br>");
+}
+
+/** 1234.5 → "1.234,50" — a tabela já diz "(R$)" no cabeçalho, como a antiga. */
+const DECIMAL = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+function valor(n: number) {
+  return DECIMAL.format(n);
+}
+
+function plural(n: number, um: string, varios: string) {
+  return `${n} ${n === 1 ? um : varios}`;
+}
+
+function dataHoraSaoPaulo(quando: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(quando);
+}
+
+function moldura({
+  titulo,
+  previa,
+  conteudo,
+}: {
+  titulo: string;
+  /** Linha que o Gmail/Outlook mostram ao lado do assunto, na caixa de entrada. */
+  previa: string;
+  conteudo: string;
+}) {
+  const e = CONTATO.endereco;
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>${esc(titulo)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:${COR.fundo};">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${COR.fundo};">${esc(previa)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${COR.fundo}" style="background-color:${COR.fundo};">
+<tr><td align="center" style="padding:20px 8px;">
+<!--[if mso]><table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;width:100%;">
+<tr><td style="padding:0 4px 14px;font-family:${FONTE};">
+<span style="font-size:20px;font-weight:bold;color:${COR.marca};">${esc(CONTATO.nome)}</span>
+<span style="font-size:12px;color:${COR.tenue};">&nbsp;·&nbsp;atacado de moda íntima desde ${esc(CONTATO.fundacao)}</span>
+</td></tr>
+<tr><td bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid ${COR.borda};border-radius:12px;padding:26px 18px;font-family:${FONTE};font-size:14px;line-height:1.55;color:${COR.texto};">
+${conteudo}
+</td></tr>
+<tr><td style="padding:16px 4px 0;font-family:${FONTE};font-size:12px;line-height:1.6;color:${COR.tenue};">
+${esc(CONTATO.razao)}<br>
+${esc(`${e.logradouro}, ${e.bairro} — ${e.cidade}/${e.uf}`)}<br>
+WhatsApp ${esc(CONTATO.whatsapp)} · <a href="mailto:${esc(CONTATO.email)}" style="color:${COR.suave};">${esc(CONTATO.email)}</a> · ${esc(CONTATO.horario)}
+</td></tr>
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
+function h1(texto: string) {
+  return `<h1 style="margin:0 0 12px;font-family:${FONTE};font-size:20px;line-height:1.3;color:${COR.texto};">${esc(texto)}</h1>`;
+}
+
+function h2(texto: string, apoio?: string) {
+  return `<h2 style="margin:26px 0 8px;font-family:${FONTE};font-size:15px;line-height:1.3;color:${COR.texto};">${esc(texto)}${
+    apoio ? ` <span style="font-weight:normal;font-size:12px;color:${COR.suave};">— ${esc(apoio)}</span>` : ""
+  }</h2>`;
+}
+
+/** `html` já precisa vir escapado (permite <strong> montado aqui). */
+function paragrafo(html: string) {
+  return `<p style="margin:0 0 12px;font-family:${FONTE};font-size:14px;line-height:1.55;color:${COR.texto};">${html}</p>`;
+}
+
+/** Botão "à prova de Outlook": célula de tabela pintada, não <a> com padding. */
+function botao(href: string, rotulo: string) {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 16px;"><tr>
+<td bgcolor="${COR.marca}" style="background-color:${COR.marca};border-radius:999px;">
+<a href="${esc(href)}" style="display:inline-block;padding:11px 22px;font-family:${FONTE};font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;">${esc(rotulo)}</a>
+</td></tr></table>`;
+}
+
+function link(href: string, rotulo = href) {
+  return `<a href="${esc(href)}" style="color:${COR.marca};">${esc(rotulo)}</a>`;
+}
+
+/** Bloco rótulo → valor (dados do cliente). Linha sem valor não aparece. */
+function tabelaDados(linhas: [string, string | null | undefined][]) {
+  const visiveis = linhas.filter(([, v]) => v && String(v).trim());
+  if (!visiveis.length) return "";
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:${FONTE};font-size:13px;">
+${visiveis
+  .map(
+    ([rotulo, v]) => `<tr>
+<td width="130" valign="top" style="padding:5px 10px 5px 0;color:${COR.suave};border-bottom:1px solid ${COR.borda};">${esc(rotulo)}</td>
+<td valign="top" style="padding:5px 0;color:${COR.texto};font-weight:bold;border-bottom:1px solid ${COR.borda};word-break:break-word;">${esc(v)}</td>
+</tr>`,
+  )
+  .join("\n")}
+</table>`;
+}
+
+/** Caixa de destaque (observações, aviso). `html` já escapado. */
+function caixa(html: string) {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 8px;"><tr>
+<td bgcolor="${COR.destaque}" style="background-color:${COR.destaque};border-left:3px solid ${COR.marca};padding:10px 12px;font-family:${FONTE};font-size:13px;line-height:1.55;color:${COR.texto};">${html}</td>
+</tr></table>`;
+}
+
+/** Passo a passo numerado em tabela — <ol> perde o recuo no Outlook. */
+function passos(itens: { titulo: string; texto: string }[]) {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:${FONTE};">
+${itens
+  .map(
+    (p, i) => `<tr>
+<td width="30" valign="top" style="padding:6px 0;"><span style="display:inline-block;width:22px;height:22px;line-height:22px;border-radius:11px;background-color:${COR.destaque};color:${COR.marca};font-size:12px;font-weight:bold;text-align:center;">${i + 1}</span></td>
+<td valign="top" style="padding:6px 0;font-size:14px;line-height:1.55;color:${COR.texto};"><strong>${esc(p.titulo)}</strong><br><span style="color:${COR.suave};">${p.texto}</span></td>
+</tr>`,
+  )
+  .join("\n")}
+</table>`;
+}
+
+/** Os mesmos passos em texto puro (alternativa do e-mail). */
+function passosTexto(itens: { titulo: string; texto: string }[]) {
+  const semHtml = (html: string) =>
+    html
+      // link vira "rótulo (endereço)", ou só o endereço quando são iguais
+      .replace(/<a href="([^"]+)"[^>]*>([^<]*)<\/a>/g, (_, href: string, rotulo: string) =>
+        rotulo === href ? href : `${rotulo} (${href})`,
+      )
+      .replace(/<[^>]+>/g, "")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&");
+  return itens.map((p, i) => `${i + 1}. ${p.titulo}\n   ${semHtml(p.texto)}`).join("\n\n");
+}
+
+const RODAPE_TEXTO = `—
+${CONTATO.nome} · ${CONTATO.endereco.logradouro}, ${CONTATO.endereco.bairro} — ${CONTATO.endereco.cidade}/${CONTATO.endereco.uf}
+WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email} · ${CONTATO.horario}`;
+
+// -------------------------------------------------------------------- pedido
+
+export type ItemPedidoEmail = {
+  titulo: string;
+  modelo: string;
+  /** Fabricante do produto. pedido_itens não guarda — vem do produto no fechamento. */
+  marca: string | null;
+  tamanho: string | null;
+  pecasNoKit: number;
+  qtdKits: number;
+  precoKitAtacado: number;
+  precoKitVarejo: number;
+};
+
+export type PedidoParaEmail = {
+  id: number;
+  numero: string;
+  criadoEm: Date;
+  cliente: {
+    nome: string;
+    nomeFantasia: string | null;
+    documento: string | null;
+    email: string | null;
+    telefone: string | null;
+    cidade: string | null;
+    uf: string | null;
+  };
+  observacoes: string | null;
+  itens: ItemPedidoEmail[];
+  /** Totais do pedido como o gatilho do banco gravou (recalcular_pedido). */
+  totalAtacado: number;
+  totalVarejo: number;
+  totalPecas: number;
+  totalEmbalagens: number;
+};
+
+type Tabela = "atacado" | "varejo";
+
+const TABELA: Record<Tabela, { titulo: string; apoio: string; rodape: string }> = {
+  atacado: {
+    titulo: "Valores de Atacado",
+    apoio: "o preço de lojista",
+    rodape: "Valor Pedido Atacado",
+  },
+  varejo: {
+    titulo: "Valores de Varejo",
+    apoio: "preço de revenda ao consumidor",
+    rodape: "Valor Pedido Varejo",
+  },
+};
+
+function precoDoItem(i: ItemPedidoEmail, tabela: Tabela) {
+  return tabela === "atacado" ? i.precoKitAtacado : i.precoKitVarejo;
+}
+
+function rotuloDocumento(documento: string | null) {
+  return (documento ?? "").length === 14 ? "CNPJ" : "CPF";
+}
+
+/**
+ * Tabela no formato do e-mail do sistema antigo, pedido do cliente (nov/2026):
+ * Produto · Ref · Marca · Tamanho · Qtd · Valor (R$), com o total no rodapé.
+ * Qtd é em EMBALAGENS; quantas peças vêm em cada uma fica embaixo do nome,
+ * junto do preço da embalagem — "Valor" é a linha inteira (qtd × embalagem).
+ */
+function tabelaItensHtml(pedido: PedidoParaEmail, tabela: Tabela) {
+  const cfg = TABELA[tabela];
+  // Cabeçalho em caixa normal e 11px: no celular a tabela tem ~330px para seis
+  // colunas, e cada letra a mais no cabeçalho sai da coluna do produto.
+  const th = (texto: string, alinhar: "left" | "right" | "center" = "left", largura = "") =>
+    `<th align="${alinhar}"${largura ? ` width="${largura}"` : ""} style="padding:8px 5px;font-family:${FONTE};font-size:11px;font-weight:bold;color:${COR.suave};border-bottom:1px solid ${COR.borda};">${texto}</th>`;
+  const td = (html: string, alinhar: "left" | "right" | "center" = "left", extra = "") =>
+    `<td align="${alinhar}" valign="top" style="padding:8px 5px;font-family:${FONTE};font-size:13px;line-height:1.4;color:${COR.texto};border-bottom:1px solid ${COR.borda};${extra}">${html}</td>`;
+
+  const linhas = pedido.itens
+    .map((i) => {
+      const preco = precoDoItem(i, tabela);
+      return `<tr>
+${td(
+  `${esc(i.titulo)}<br><span style="font-size:11px;color:${COR.suave};">Emb. com ${esc(plural(i.pecasNoKit, "peça", "peças"))} · ${esc(reais(preco))} cada</span>`,
+)}
+${td(esc(i.modelo))}
+${td(esc(i.marca ?? "—"))}
+${td(esc(i.tamanho ?? "—"), "center")}
+${td(String(i.qtdKits), "center")}
+${td(valor(i.qtdKits * preco), "right", "white-space:nowrap;")}
+</tr>`;
+    })
+    .join("\n");
+
+  const total = tabela === "atacado" ? pedido.totalAtacado : pedido.totalVarejo;
+
+  return `${h2(cfg.titulo, cfg.apoio)}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid ${COR.borda};">
+<tr bgcolor="${COR.cabecalho}" style="background-color:${COR.cabecalho};">
+${th("Produto", "left", "38%")}${th("Ref")}${th("Marca")}${th("Tamanho", "center")}${th("Qtd<br>(emb.)", "center")}${th("Valor<br>(R$)", "right")}
+</tr>
+${linhas}
+<tr bgcolor="${COR.cabecalho}" style="background-color:${COR.cabecalho};">
+<td colspan="6" align="right" style="padding:10px 6px;font-family:${FONTE};font-size:14px;font-weight:bold;color:${COR.texto};">${esc(cfg.rodape)}: ${esc(reais(total))}</td>
+</tr>
+</table>`;
+}
+
+function tabelaItensTexto(pedido: PedidoParaEmail, tabela: Tabela) {
+  const cfg = TABELA[tabela];
+  const total = tabela === "atacado" ? pedido.totalAtacado : pedido.totalVarejo;
+  const linhas = pedido.itens.map((i) => {
+    const preco = precoDoItem(i, tabela);
+    return `• ${i.titulo} · Ref ${i.modelo} · ${i.marca ?? "—"} · Tam. ${i.tamanho ?? "—"}
+  ${plural(i.qtdKits, "embalagem", "embalagens")} com ${plural(i.pecasNoKit, "peça", "peças")} × ${reais(preco)} = ${reais(i.qtdKits * preco)}`;
+  });
+  return `${cfg.titulo.toUpperCase()} (${cfg.apoio})
+${linhas.join("\n")}
+${cfg.rodape}: ${reais(total)}`;
+}
+
+function dadosDoCliente(pedido: PedidoParaEmail): [string, string | null][] {
+  const c = pedido.cliente;
+  return [
+    ["Razão social / nome", c.nome],
+    ["Nome da loja", c.nomeFantasia],
+    [rotuloDocumento(c.documento), c.documento ? formatarDocumento(c.documento) : null],
+    ["Telefone", c.telefone],
+    ["E-mail", c.email],
+    ["Cidade", c.cidade ? `${c.cidade}${c.uf ? `/${c.uf}` : ""}` : null],
+  ];
+}
+
+function totalGeral(pedido: PedidoParaEmail) {
+  return `${plural(pedido.totalEmbalagens, "embalagem", "embalagens")} · ${plural(pedido.totalPecas, "peça", "peças")}`;
+}
+
+function htmlPedido(pedido: PedidoParaEmail, paraLojista: boolean, comVarejo: boolean) {
+  const nome = pedido.cliente.nomeFantasia || pedido.cliente.nome;
+  const quando = dataHoraSaoPaulo(pedido.criadoEm);
+  const abertura = paraLojista
+    ? `${h1(`Recebemos o seu pedido nº ${pedido.numero}`)}
+${paragrafo(`Olá, ${esc(nome)}! Seu pedido chegou em ${esc(quando)}. A nossa equipe entra em contato para combinar <strong>pagamento e envio</strong> — nada é cobrado pelo site.`)}
+${paragrafo("Confira abaixo os itens e os seus dados. Algo errado? Responda este e-mail ou chame no WhatsApp.")}`
+    : `${h1(`Novo pedido nº ${pedido.numero}`)}
+${paragrafo(`De <strong>${esc(nome)}</strong>, fechado pelo site em ${esc(quando)}. Responder este e-mail fala direto com o cliente.`)}
+${botao(`${urlDosLinks()}/admin/pedidos/${pedido.id}`, "Abrir o pedido no painel")}`;
+
+  const observacoes = pedido.observacoes
+    ? `${h2("Observações do cliente")}${caixa(escMultilinha(pedido.observacoes))}`
+    : "";
+
+  return moldura({
+    titulo: `Pedido ${pedido.numero}`,
+    previa: `${totalGeral(pedido)} · Atacado ${reais(pedido.totalAtacado)}`,
+    conteudo: `${abertura}
+${h2(paraLojista ? "Seus dados" : "Cliente")}
+${tabelaDados(dadosDoCliente(pedido))}
+${observacoes}
+${tabelaItensHtml(pedido, "atacado")}
+${comVarejo ? tabelaItensHtml(pedido, "varejo") : ""}
+${paragrafo(`<span style="display:block;margin-top:14px;font-size:13px;color:${COR.suave};">Total do pedido: <strong style="color:${COR.texto};">${esc(totalGeral(pedido))}</strong>.</span>`)}`,
+  });
+}
+
+function textoPedido(pedido: PedidoParaEmail, paraLojista: boolean, comVarejo: boolean) {
+  const nome = pedido.cliente.nomeFantasia || pedido.cliente.nome;
+  const quando = dataHoraSaoPaulo(pedido.criadoEm);
+  const abertura = paraLojista
+    ? `Olá, ${nome}!\n\nRecebemos o seu pedido nº ${pedido.numero} (${quando}). Nossa equipe entra em contato para combinar pagamento e envio — nada é cobrado pelo site.`
+    : `Novo pedido nº ${pedido.numero} de ${nome}, fechado pelo site em ${quando}.\nNo painel: ${urlDosLinks()}/admin/pedidos/${pedido.id}`;
+
+  const dados = dadosDoCliente(pedido)
+    .filter(([, v]) => v)
+    .map(([r, v]) => `${r}: ${v}`)
+    .join("\n");
+
+  return `${abertura}
+
+${paraLojista ? "SEUS DADOS" : "CLIENTE"}
+${dados}
+${pedido.observacoes ? `\nOBSERVAÇÕES DO CLIENTE\n${pedido.observacoes}\n` : ""}
+${tabelaItensTexto(pedido, "atacado")}
+${comVarejo ? `\n${tabelaItensTexto(pedido, "varejo")}\n` : ""}
+Total do pedido: ${totalGeral(pedido)}
+
+${RODAPE_TEXTO}`;
+}
+
+/**
+ * Dispara a confirmação para o cliente e a cópia para a casa.
+ *
+ * A casa recebe SEMPRE as duas tabelas (Atacado e Varejo). O lojista só vê a
+ * de Varejo se `exibir_preco_varejo` estiver ligado — é a mesma regra do
+ * catálogo: com o interruptor desligado, o Varejo some do site e do e-mail.
+ */
 export async function enviarEmailsDePedido(
   pedido: PedidoParaEmail,
   emailsDaCasa: string[],
+  { varejoParaLojista }: { varejoParaLojista: boolean },
 ) {
   const t = transporte();
   if (!t) {
@@ -107,27 +452,28 @@ export async function enviarEmailsDePedido(
     return { enviado: false };
   }
 
-  const remetente =
-    process.env.EMAIL_REMETENTE ?? `Comercial Galé <${CONTATO.email}>`;
-
   const envios: Promise<unknown>[] = [];
-  if (pedido.clienteEmail) {
+  if (pedido.cliente.email) {
     envios.push(
       t.sendMail({
-        from: remetente,
-        to: pedido.clienteEmail,
+        from: remetente(),
+        to: pedido.cliente.email,
         subject: `Pedido ${pedido.numero} recebido — Comercial Galé`,
-        text: corpoTexto(pedido, true),
+        text: textoPedido(pedido, true, varejoParaLojista),
+        html: htmlPedido(pedido, true, varejoParaLojista),
       }),
     );
   }
   for (const email of emailsDaCasa) {
     envios.push(
       t.sendMail({
-        from: remetente,
+        from: remetente(),
         to: email,
-        subject: `Novo pedido ${pedido.numero} — ${pedido.clienteNome}`,
-        text: corpoTexto(pedido, false),
+        // Responder a cópia cai direto no lojista.
+        ...(pedido.cliente.email ? { replyTo: pedido.cliente.email } : {}),
+        subject: `Novo pedido ${pedido.numero} — ${pedido.cliente.nomeFantasia || pedido.cliente.nome}`,
+        text: textoPedido(pedido, false, true),
+        html: htmlPedido(pedido, false, true),
       }),
     );
   }
@@ -195,7 +541,7 @@ ${CONTATO.nome} · WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}`;
 
   try {
     await t.sendMail({
-      from: process.env.EMAIL_REMETENTE ?? `Comercial Galé <${CONTATO.email}>`,
+      from: remetente(),
       to: para,
       subject: assunto,
       text: texto,
@@ -238,70 +584,254 @@ export type CadastroParaEmail = {
   uf: string | null;
 };
 
-function documentoFormatado(c: CadastroParaEmail) {
-  const d = c.documento;
-  return c.tipoPessoa === "juridica" && d.length === 14
-    ? `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
-    : d.length === 11
-      ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
-      : d;
+export type ContextoCadastro = {
+  /** true = já vê preço (aprovação automática); false = aguarda a equipe. */
+  liberado: boolean;
+  /** true = a ficha já existia (cliente antigo) e só ganhou o login agora. */
+  fichaExistente: boolean;
+  pedidoMinimo: number;
+  exibirVarejo: boolean;
+};
+
+/** Como o site funciona, para o e-mail de boas-vindas. Texto já escapado. */
+function comoFunciona(ctx: ContextoCadastro) {
+  const site = urlDosLinks();
+  return [
+    ctx.liberado
+      ? {
+          titulo: "Os preços já estão liberados",
+          texto: ctx.exibirVarejo
+            ? "Com o login, cada produto mostra o preço de <strong>Atacado</strong> (o seu preço de lojista) e o de <strong>Varejo</strong> (preço de revenda ao consumidor)."
+            : "Com o login, cada produto mostra o preço de <strong>Atacado</strong>, o seu preço de lojista.",
+        }
+      : {
+          titulo: "Os preços aparecem quando a equipe liberar",
+          texto:
+            "O seu login já funciona. Assim que a nossa equipe conferir os dados, os preços passam a aparecer no site — avisamos por e-mail.",
+        },
+    {
+      titulo: "Venda por embalagem fechada",
+      texto:
+        "Cada produto vem em embalagem com um número fixo de peças. A página do produto mostra quantas peças vêm na embalagem, o preço da embalagem e o preço por peça — você escolhe quantas embalagens quer de cada tamanho.",
+    },
+    ...(ctx.pedidoMinimo > 0
+      ? [
+          {
+            titulo: `Atacado a partir de ${reais(ctx.pedidoMinimo)}`,
+            texto:
+              "É o valor de referência das compras no atacado. O site avisa quando o pedido está abaixo, mas aceita mesmo assim — a equipe combina com você.",
+          },
+        ]
+      : []),
+    {
+      titulo: "Como fechar o pedido",
+      texto:
+        "Na página do produto, escolha as embalagens por tamanho e clique em <strong>Adicionar ao pedido</strong>. Quando terminar, abra <strong>Pedido</strong> no topo do site, confira os itens e clique em <strong>Fechar pedido</strong>. A confirmação chega por e-mail.",
+    },
+    {
+      titulo: "Pagamento e envio, direto com a gente",
+      texto:
+        "Depois do pedido, a nossa equipe entra em contato para combinar pagamento e envio. <strong>Nada é cobrado pelo site.</strong>",
+    },
+    {
+      titulo: "Para entrar de novo",
+      texto: `Entre em ${link(`${site}/entrar`)} com o seu e-mail e a senha que você criou. Esqueceu a senha? Peça um link novo em ${link(`${site}/esqueci-senha`)}.`,
+    },
+  ];
+}
+
+function boasVindas(cadastro: CadastroParaEmail, ctx: ContextoCadastro) {
+  const site = urlDosLinks();
+  const nome = cadastro.nomeFantasia || cadastro.nome;
+  const titulo = ctx.liberado
+    ? "Cadastro liberado: os preços já estão no site"
+    : "Recebemos o seu cadastro";
+  const abertura = ctx.liberado
+    ? `Olá, ${esc(nome)}! Sua loja está cadastrada na ${esc(CONTATO.nome)} e o seu login já funciona: é só entrar com <strong>${esc(cadastro.email)}</strong> e a senha que você criou.`
+    : `Olá, ${esc(nome)}! Seu login já está criado (<strong>${esc(cadastro.email)}</strong> e a senha que você escolheu). Os preços aparecem assim que a nossa equipe conferir os dados e liberar a sua loja.`;
+  const itens = comoFunciona(ctx);
+
+  const html = moldura({
+    titulo,
+    previa: ctx.liberado
+      ? "Seu login funciona e os preços de atacado já aparecem no catálogo."
+      : "Seu login já funciona; os preços aparecem quando a equipe liberar a sua loja.",
+    conteudo: `${h1(titulo)}
+${paragrafo(abertura)}
+${botao(`${site}/produtos`, ctx.liberado ? "Ver o catálogo com preços" : "Ver o catálogo")}
+${h2("Como funciona")}
+${passos(itens)}
+${h2("Fale com a gente")}
+${paragrafo(`WhatsApp <strong>${esc(CONTATO.whatsapp)}</strong> · ${link(`mailto:${CONTATO.email}`, CONTATO.email)}<br><span style="color:${COR.suave};">${esc(CONTATO.horario)} · ${esc(`${CONTATO.endereco.logradouro}, ${CONTATO.endereco.bairro} — ${CONTATO.endereco.cidade}/${CONTATO.endereco.uf}`)}</span>`)}`,
+  });
+
+  const texto = `Olá, ${nome}!
+
+${
+  ctx.liberado
+    ? `Sua loja está cadastrada na ${CONTATO.nome} e o seu login já funciona: entre com ${cadastro.email} e a senha que você criou.`
+    : `Seu login já está criado (${cadastro.email} e a senha que você escolheu). Os preços aparecem assim que a nossa equipe conferir os dados e liberar a sua loja.`
+}
+
+Catálogo: ${site}/produtos
+
+COMO FUNCIONA
+
+${passosTexto(itens)}
+
+FALE COM A GENTE
+WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}
+${CONTATO.horario}
+
+${RODAPE_TEXTO}`;
+
+  return {
+    assunto: ctx.liberado
+      ? `Boas-vindas à ${CONTATO.nome}: seus preços estão liberados`
+      : `Recebemos o seu cadastro — ${CONTATO.nome}`,
+    html,
+    texto,
+  };
+}
+
+function avisoParaCasa(cadastro: CadastroParaEmail, ctx: ContextoCadastro) {
+  const nome = cadastro.nomeFantasia || cadastro.nome;
+  const ficha = `${urlDosLinks()}/admin/clientes/${cadastro.id}`;
+  const origem = ctx.fichaExistente
+    ? "Cliente que já tinha ficha criou o login pelo site (o e-mail digitado é o mesmo da ficha)."
+    : "Cliente novo, cadastrado pelo site.";
+  const situacao = ctx.liberado
+    ? `${ctx.fichaExistente ? "Já entrou" : "Cadastrado e liberado automaticamente: já entrou"} e vê os preços. Para suspender, mude a situação ou o "pode ver preços" na ficha.`
+    : "O login já existe, mas os preços só aparecem quando você mudar a situação para Ativo na ficha (a liberação automática está desligada em Configurações).";
+  const titulo = ctx.fichaExistente
+    ? `Cliente com ficha criou o login pelo site${ctx.liberado ? "" : " (aguardando liberação)"}: ${nome}`
+    : ctx.liberado
+      ? `Novo cliente cadastrado e liberado: ${nome}`
+      : `Novo cadastro aguardando liberação: ${nome}`;
+
+  const dados: [string, string | null][] = [
+    ["Razão social / nome", cadastro.nome],
+    ["Nome da loja", cadastro.nomeFantasia],
+    [cadastro.tipoPessoa === "juridica" ? "CNPJ" : "CPF", formatarDocumento(cadastro.documento)],
+    ["E-mail", cadastro.email],
+    ["Telefone", cadastro.telefone],
+    ["Cidade", cadastro.cidade ? `${cadastro.cidade}${cadastro.uf ? `/${cadastro.uf}` : ""}` : null],
+  ];
+
+  const html = moldura({
+    titulo,
+    previa: `${origem} ${ctx.liberado ? "Já vê os preços." : "Aguarda liberação."}`,
+    conteudo: `${h1(titulo)}
+${paragrafo(esc(origem))}
+${caixa(esc(situacao))}
+${botao(ficha, "Abrir a ficha no painel")}
+${h2(ctx.fichaExistente ? "Dados digitados no site" : "Dados do cadastro", ctx.fichaExistente ? "a ficha não foi alterada, só ganhou o login" : undefined)}
+${tabelaDados(dados)}
+${paragrafo(`<span style="display:block;margin-top:14px;font-size:13px;color:${COR.suave};">Responder este e-mail fala direto com o cliente.</span>`)}`,
+  });
+
+  const texto = `${titulo}
+
+${origem}
+${situacao}
+${ctx.fichaExistente ? "\nDados digitados no site (a ficha não foi alterada, só ganhou o login):" : ""}
+${dados
+  .filter(([, v]) => v)
+  .map(([r, v]) => `${r}: ${v}`)
+  .join("\n")}
+
+Ficha no painel:
+${ficha}`;
+
+  return {
+    assunto: ctx.fichaExistente
+      ? `Login criado pelo site${ctx.liberado ? "" : ", para liberar"} (cliente com ficha) — ${nome}`
+      : ctx.liberado
+        ? `Novo cliente cadastrado e liberado — ${nome}`
+        : `Novo cadastro para liberar — ${nome}`,
+    html,
+    texto,
+  };
 }
 
 /**
- * Solicitação de cadastro: confirmação ao lojista + aviso à casa para aprovar.
- * Falha de e-mail NÃO desfaz o cadastro — ele já está no painel.
+ * Cadastro pelo site: boas-vindas ao lojista + aviso à casa.
+ * Falha de e-mail NÃO desfaz o cadastro — ele já está no painel e o lojista
+ * já entrou.
  */
-export async function enviarEmailsDeCadastro(cadastro: CadastroParaEmail) {
+export async function enviarEmailsDeCadastro(
+  cadastro: CadastroParaEmail,
+  ctx: ContextoCadastro,
+) {
   const t = transporte();
   if (!t) {
     console.warn(`[email] SMTP não configurado — cadastro ${cadastro.id} gravado sem e-mail.`);
     return;
   }
-  const remetente = process.env.EMAIL_REMETENTE ?? `Comercial Galé <${CONTATO.email}>`;
-  const site = urlDosLinks();
-  const rodape = `—
-${CONTATO.nome} · WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}`;
 
-  const paraLojista = `Olá, ${cadastro.nomeFantasia || cadastro.nome}!
-
-Recebemos a sua solicitação de cadastro na ${CONTATO.nome}. Nossa equipe vai conferir os dados e, assim que o acesso for liberado, você recebe outro e-mail com o link para criar a sua senha. Com o login, os preços de atacado aparecem no site e você fecha pedidos por lá.
-
-Enquanto isso, o catálogo completo está aberto em ${site}.
-
-Quer agilizar? Chame a gente no WhatsApp ${CONTATO.whatsapp}.
-
-${rodape}`;
-
-  const paraCasa = `Novo cadastro pelo site, aguardando aprovação.
-
-${cadastro.nome}${cadastro.nomeFantasia ? ` (${cadastro.nomeFantasia})` : ""}
-${cadastro.tipoPessoa === "juridica" ? "CNPJ" : "CPF"}: ${documentoFormatado(cadastro)}
-E-mail: ${cadastro.email}
-Telefone: ${cadastro.telefone}
-${cadastro.cidade ? `Cidade: ${cadastro.cidade}${cadastro.uf ? `/${cadastro.uf}` : ""}\n` : ""}
-Para revisar e liberar o login:
-${site}/admin/clientes/${cadastro.id}`;
+  const lojista = boasVindas(cadastro, ctx);
+  const casa = avisoParaCasa(cadastro, ctx);
 
   const envios = [
     t.sendMail({
-      from: remetente,
+      from: remetente(),
       to: cadastro.email,
-      subject: `Recebemos o seu cadastro — ${CONTATO.nome}`,
-      text: paraLojista,
+      subject: lojista.assunto,
+      text: lojista.texto,
+      html: lojista.html,
     }),
     ...(await emailsDaCasa()).map((para) =>
       t.sendMail({
-        from: remetente,
+        from: remetente(),
         to: para,
         // Responder o aviso cai direto no lojista.
         replyTo: cadastro.email,
-        subject: `Novo cadastro para aprovar — ${cadastro.nomeFantasia || cadastro.nome}`,
-        text: paraCasa,
+        subject: casa.assunto,
+        text: casa.texto,
+        html: casa.html,
       }),
     ),
   ];
   const resultados = await Promise.allSettled(envios);
   for (const r of resultados) {
     if (r.status === "rejected") console.error(`[email] falha no cadastro ${cadastro.id}:`, r.reason);
+  }
+}
+
+/**
+ * Aviso ao lojista de que a equipe liberou a loja dele — para quem se
+ * cadastrou com a liberação automática DESLIGADA e já tem login e senha
+ * (por isso não leva link de senha, ao contrário do "acesso_liberado").
+ */
+export async function enviarAvisoDeLiberacao(para: string, nome: string) {
+  const t = transporte();
+  if (!t) return false;
+  const site = urlDosLinks();
+  const titulo = "Sua loja foi liberada: os preços já aparecem";
+  try {
+    await t.sendMail({
+      from: remetente(),
+      to: para,
+      subject: `${titulo} — ${CONTATO.nome}`,
+      text: `Olá, ${nome}!
+
+A nossa equipe liberou o seu cadastro. Entre em ${site}/entrar com o seu e-mail e a senha que você criou: os preços de atacado já aparecem e você fecha pedidos pelo site.
+
+Esqueceu a senha? ${site}/esqueci-senha
+
+${RODAPE_TEXTO}`,
+      html: moldura({
+        titulo,
+        previa: "Entre com o seu e-mail e senha: os preços de atacado já aparecem.",
+        conteudo: `${h1(titulo)}
+${paragrafo(`Olá, ${esc(nome)}! A nossa equipe liberou o seu cadastro. Entre com o seu e-mail e a senha que você criou: os preços de atacado já aparecem e você fecha pedidos pelo site.`)}
+${botao(`${site}/entrar?destino=/produtos`, "Entrar e ver os preços")}
+${paragrafo(`<span style="font-size:13px;color:${COR.suave};">Esqueceu a senha? ${link(`${site}/esqueci-senha`, "Peça um link novo")}.</span>`)}`,
+      }),
+    });
+    return true;
+  } catch (erro) {
+    console.error("[email] falha no aviso de liberação:", erro);
+    return false;
   }
 }

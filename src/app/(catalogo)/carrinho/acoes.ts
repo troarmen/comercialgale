@@ -148,11 +148,13 @@ export async function fecharPedido(
     };
   }
 
-  // Títulos e referências congelados no pedido, como manda o esquema.
+  // Títulos e referências congelados no pedido, como manda o esquema. A marca
+  // não é congelada (pedido_itens não tem a coluna): vem junto só para o
+  // e-mail, que a mostra na tabela como o sistema antigo fazia.
   const idsProdutos = [...new Set(validos.map((i) => i.produtoId))];
   const { data: produtos } = await supabase
     .from("produtos")
-    .select("id, titulo, modelo")
+    .select("id, titulo, modelo, fabricantes(nome)")
     .in("id", idsProdutos);
   const produtoPorId = new Map((produtos ?? []).map((p) => [p.id, p]));
 
@@ -240,28 +242,57 @@ export async function fecharPedido(
     detalhes: { numero: pedido.numero, origem: "catalogo" },
   });
 
-  // E-mails: para o cliente e para a casa. Falha de e-mail NÃO desfaz o pedido.
-  const destinosDaCasa = await emailsDaCasa();
-
+  // E-mails: para o cliente e para a casa. Falha de e-mail NÃO desfaz o
+  // pedido — por isso tudo daqui para baixo fica dentro do try.
   try {
+    // Totais como o gatilho recalcular_pedido gravou: é o banco que manda no
+    // valor (PAINEL.md §4). A conta local só entra se a releitura falhar.
+    const [destinosDaCasa, config, { data: totais }] = await Promise.all([
+      emailsDaCasa(),
+      configPublica(),
+      admin
+        .from("pedidos")
+        .select("total_atacado, total_varejo, total_pecas, criado_em")
+        .eq("id", pedido.id)
+        .single(),
+    ]);
+    const somar = (f: (l: (typeof linhas)[number]) => number) =>
+      linhas.reduce((s, l) => s + f(l), 0);
+
     await enviarEmailsDePedido(
       {
+        id: pedido.id,
         numero: pedido.numero,
-        clienteNome: cliente.nome_fantasia || cliente.nome,
-        clienteEmail: cliente.email,
+        criadoEm: totais?.criado_em ? new Date(totais.criado_em) : new Date(),
+        cliente: {
+          nome: cliente.nome,
+          nomeFantasia: cliente.nome_fantasia,
+          documento: cliente.documento,
+          email: cliente.email,
+          telefone: cliente.telefone1,
+          cidade: cliente.cidade,
+          uf: cliente.uf,
+        },
         observacoes: observacoes.trim() || null,
         itens: linhas.map((l) => ({
           titulo: l.produto_titulo,
           modelo: l.produto_modelo,
+          marca: produtoPorId.get(l.produto_id)?.fabricantes?.nome ?? null,
           tamanho: l.tamanho,
           pecasNoKit: l.pecas_no_kit,
           qtdKits: l.qtd_kits,
-          precoKit: l.preco_kit_atacado,
+          precoKitAtacado: l.preco_kit_atacado,
+          precoKitVarejo: l.preco_kit_varejo,
         })),
-        totalAtacado,
-        totalPecas: linhas.reduce((s, l) => s + l.pecas_no_kit * l.qtd_kits, 0),
+        totalAtacado: totais ? Number(totais.total_atacado) : totalAtacado,
+        totalVarejo: totais
+          ? Number(totais.total_varejo)
+          : somar((l) => l.qtd_kits * l.preco_kit_varejo),
+        totalPecas: totais?.total_pecas ?? somar((l) => l.pecas_no_kit * l.qtd_kits),
+        totalEmbalagens: somar((l) => l.qtd_kits),
       },
       destinosDaCasa,
+      { varejoParaLojista: config.exibirVarejo },
     );
   } catch (e) {
     console.error("[pedido] e-mail falhou (pedido mantido):", e);
