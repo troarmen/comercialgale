@@ -1,59 +1,63 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import { linkWhatsApp } from "@/lib/contato";
-import { solicitarCadastro, type EstadoCadastro } from "./acoes";
+import { cadastrarLojista, type EstadoCadastro } from "./acoes";
 
 const CLASSE_CAMPO =
   "h-11 w-full rounded-lg border border-borda bg-superficie px-3 text-sm text-texto outline-none transition placeholder:text-tenue focus:border-gale-500";
 const CLASSE_ROTULO = "mb-1.5 block text-sm font-medium text-texto";
 
-export function FormularioCadastro() {
+export function FormularioCadastro({
+  carimbo,
+  automatico,
+}: {
+  /** horário do desenho do formulário, assinado (ver servidor.ts) */
+  carimbo: string;
+  /** Configurações → "Liberar cadastro automaticamente" */
+  automatico: boolean;
+}) {
   const [estado, enviar, enviando] = useActionState<EstadoCadastro, FormData>(
-    solicitarCadastro,
+    cadastrarLojista,
     { ok: false },
   );
   const [tipoPessoa, setTipoPessoa] = useState<"juridica" | "fisica">("juridica");
 
+  // Só chega aqui o "ok" do honeypot (robô) — o cadastro de verdade termina
+  // com redirect para /cadastro/bem-vindo, já logado.
   if (estado.ok) {
     return (
       <div className="rounded-2xl border border-borda/60 bg-superficie p-8 text-center shadow-suave">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-ok-fundo">
-          <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6 text-ok-texto" aria-hidden="true">
-            <path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
-        <h2 className="mt-4 text-xl font-bold tracking-tight text-texto">
-          Cadastro enviado!
-        </h2>
+        <h2 className="text-xl font-bold tracking-tight text-texto">Cadastro enviado!</h2>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-suave">
-          Nossa equipe confere os dados e libera o seu acesso de lojista. Você
-          recebe o login por e-mail — e enquanto isso já pode navegar por todo o
-          catálogo.
+          Se precisar de ajuda, fale com a nossa equipe pelo WhatsApp.
         </p>
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href="/produtos"
-            className="flex h-11 items-center rounded-full bg-acento px-6 text-sm font-semibold text-white transition hover:bg-acento-forte"
-          >
-            Ver o catálogo
-          </Link>
-          <a
-            href={linkWhatsApp("Olá! Acabei de enviar meu cadastro pelo site e quero agilizar a liberação.")}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm font-semibold text-acento-texto transition hover:text-acento-forte"
-          >
-            Agilizar pelo WhatsApp →
-          </a>
-        </div>
+        <Link
+          href="/produtos"
+          className="mx-auto mt-6 flex h-11 w-fit items-center rounded-full bg-acento px-6 text-sm font-semibold text-white transition hover:bg-acento-forte"
+        >
+          Ver o catálogo
+        </Link>
       </div>
     );
   }
 
   return (
-    <form action={enviar} className="rounded-2xl border border-borda/60 bg-superficie p-6 shadow-suave sm:p-8">
+    <form
+      action={enviar}
+      // O React 19 LIMPA o formulário depois de toda action chamada pelo
+      // `action` — inclusive quando ela volta com erro: o lojista perderia
+      // tudo que digitou por causa de um CPF errado. Interceptando o submit e
+      // chamando a action numa transição, nada é apagado. O `action` fica
+      // para o envio funcionar mesmo antes de o JavaScript carregar.
+      onSubmit={(e) => {
+        e.preventDefault();
+        const dados = new FormData(e.currentTarget);
+        startTransition(() => enviar(dados));
+      }}
+      className="rounded-2xl border border-borda/60 bg-superficie p-6 shadow-suave sm:p-8"
+    >
       {/* Honeypot anti-robô: fica fora da tela e fora da ordem de tabulação */}
       <div className="absolute -left-[9999px]" aria-hidden="true">
         <label>
@@ -61,6 +65,7 @@ export function FormularioCadastro() {
           <input type="text" name="website" tabIndex={-1} autoComplete="off" />
         </label>
       </div>
+      <input type="hidden" name="inicio" value={carimbo} />
 
       <fieldset>
         <legend className={CLASSE_ROTULO}>Sua loja compra como</legend>
@@ -112,11 +117,16 @@ export function FormularioCadastro() {
           <label htmlFor="documento" className={CLASSE_ROTULO}>
             {tipoPessoa === "juridica" ? "CNPJ" : "CPF"} *
           </label>
+          {/* CNPJ sem teclado numérico: desde jul/2026 a Receita emite CNPJ
+              com letras (ver src/lib/validacao.ts). */}
           <input
             id="documento"
             name="documento"
             required
-            inputMode="numeric"
+            maxLength={20}
+            inputMode={tipoPessoa === "juridica" ? "text" : "numeric"}
+            autoCapitalize="characters"
+            autoComplete="off"
             placeholder={tipoPessoa === "juridica" ? "00.000.000/0000-00" : "000.000.000-00"}
             className={CLASSE_CAMPO}
           />
@@ -218,10 +228,75 @@ export function FormularioCadastro() {
         </div>
       </div>
 
+      <h2 className="mt-7 text-sm font-semibold uppercase tracking-wider text-tenue">
+        Seu acesso
+      </h2>
+      <p className="mt-1 text-xs leading-relaxed text-suave">
+        Você entra no site com o e-mail acima e esta senha.
+      </p>
+      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="senha" className={CLASSE_ROTULO}>
+            Crie uma senha *
+          </label>
+          <input
+            id="senha"
+            name="senha"
+            type="password"
+            required
+            minLength={8}
+            maxLength={72}
+            autoComplete="new-password"
+            aria-describedby="senha-dica"
+            className={CLASSE_CAMPO}
+          />
+          <p id="senha-dica" className="mt-1 text-xs text-suave">
+            Pelo menos 8 caracteres.
+          </p>
+        </div>
+        <div>
+          <label htmlFor="confirmacao" className={CLASSE_ROTULO}>
+            Confirme a senha *
+          </label>
+          <input
+            id="confirmacao"
+            name="confirmacao"
+            type="password"
+            required
+            minLength={8}
+            maxLength={72}
+            autoComplete="new-password"
+            className={CLASSE_CAMPO}
+          />
+        </div>
+      </div>
+
       {estado.erro && (
-        <p role="alert" className="mt-5 rounded-lg bg-alerta-fundo px-3 py-2 text-sm font-medium text-alerta-texto">
-          {estado.erro}
-        </p>
+        <div role="alert" className="mt-5 rounded-lg bg-alerta-fundo px-3 py-2.5 text-sm font-medium text-alerta-texto">
+          <p>{estado.erro}</p>
+          {estado.saida === "entrar" && (
+            <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+              <Link href="/entrar" className="font-semibold underline underline-offset-2">
+                Entrar
+              </Link>
+              <Link href="/esqueci-senha" className="font-semibold underline underline-offset-2">
+                Esqueci minha senha
+              </Link>
+            </p>
+          )}
+          {estado.saida === "whatsapp" && (
+            <p className="mt-2">
+              <a
+                href={linkWhatsApp("Olá! Tentei fazer o cadastro pelo site e o meu documento já tem ficha na Galé. Pode liberar o meu acesso?")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold underline underline-offset-2"
+              >
+                Falar no WhatsApp
+              </a>
+            </p>
+          )}
+        </div>
       )}
 
       <button
@@ -229,11 +304,15 @@ export function FormularioCadastro() {
         disabled={enviando}
         className="mt-6 h-12 w-full rounded-full bg-acento text-sm font-semibold text-white transition hover:bg-acento-forte disabled:opacity-60 sm:w-auto sm:px-8"
       >
-        {enviando ? "Enviando…" : "Enviar cadastro"}
+        {enviando
+          ? "Criando a sua conta…"
+          : automatico
+            ? "Criar conta e ver os preços"
+            : "Criar conta"}
       </button>
 
       <p className="mt-3 text-xs leading-relaxed text-suave">
-        Usamos esses dados só para liberar o seu acesso e faturar os pedidos.
+        Usamos esses dados só para o seu acesso e para faturar os pedidos.
         Nada de spam.
       </p>
     </form>
