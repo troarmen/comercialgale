@@ -1,6 +1,13 @@
 "use client";
 
-import { startTransition, useActionState, useEffect, useRef } from "react";
+import { unstable_rethrow } from "next/navigation";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import { useFormStatus } from "react-dom";
 
 /** Estilo único dos campos das telas de cadastro. */
@@ -30,12 +37,24 @@ export const CAMPO =
  * Uso: `const [estado, aoEnviar, pendente] = useEnvio(acao, {});`
  *      `<form onSubmit={aoEnviar}>`
  */
-export function useEnvio<E>(
+export function useEnvio<E extends { ok?: boolean; erro?: string }>(
   acao: (anterior: E, form: FormData) => Promise<E>,
   inicial: E,
 ) {
   const [estado, despachar, pendente] = useActionState<E, FormData>(
-    acao as (anterior: Awaited<E>, form: FormData) => Promise<E>,
+    async (anterior, form) => {
+      try {
+        return await acao(anterior, form);
+      } catch (erro) {
+        // redirect() da action (cadastro novo → ficha) chega aqui como erro
+        // e precisa seguir para o roteador do Next.
+        unstable_rethrow(erro);
+        // Queda de rede ou falha inesperada no servidor: sem este catch o
+        // erro subia até a tela de erro do Next e levava junto tudo o que
+        // estava digitado. Assim o formulário fica como está, com o aviso.
+        return { ...anterior, ok: false, erro: FALHA_ENVIO };
+      }
+    },
     inicial as Awaited<E>,
   );
 
@@ -49,6 +68,29 @@ export function useEnvio<E>(
   return [estado, aoEnviar, pendente] as const;
 }
 
+const FALHA_ENVIO =
+  "Não foi possível falar com o servidor, então nada foi salvo. Confira a internet e clique em salvar de novo — o que você preencheu continua aqui.";
+
+const nadaParaAssinar = () => () => {};
+
+/**
+ * `false` no HTML do servidor e até a página hidratar; `true` depois.
+ *
+ * Os formulários enviam por onSubmit (ver useEnvio). Antes da hidratação esse
+ * onSubmit ainda não existe, e um clique em Salvar faria o envio nativo do
+ * navegador: GET na própria página com todos os campos — preços inclusive —
+ * na barra de endereço, e nada gravado. Com o botão desabilitado até
+ * hidratar, nem o clique nem o Enter num campo enviam nada (o navegador não
+ * faz o envio implícito quando o botão padrão do form está desabilitado).
+ */
+export function useHidratado() {
+  return useSyncExternalStore(
+    nadaParaAssinar,
+    () => true,
+    () => false,
+  );
+}
+
 export function BotaoSalvar({
   rotulo = "Salvar",
   salvando = false,
@@ -58,11 +100,12 @@ export function BotaoSalvar({
   salvando?: boolean;
 }) {
   const { pending } = useFormStatus();
+  const hidratado = useHidratado();
   const ocupado = pending || salvando;
   return (
     <button
       type="submit"
-      disabled={ocupado}
+      disabled={ocupado || !hidratado}
       className="h-10 rounded-lg bg-acento px-5 text-sm font-semibold text-white transition hover:bg-acento-forte disabled:opacity-60"
     >
       {ocupado ? "Salvando…" : rotulo}
