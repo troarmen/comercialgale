@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { arvoreCategorias } from "@/lib/catalogo";
 import { CONTATO, linkWhatsApp } from "@/lib/contato";
+import { logoDaLoja } from "@/lib/vitrine";
 
 const INSTITUCIONAL = [
   { href: "/produtos", nome: "Todos os produtos" },
@@ -14,7 +15,8 @@ const INSTITUCIONAL = [
 ];
 
 export async function Rodape() {
-  const categorias = await arvoreCategorias();
+  // Logo: o mesmo do cabeçalho (padrão ou o enviado pelo painel, Vitrine).
+  const [categorias, logo] = await Promise.all([arvoreCategorias(), logoDaLoja()]);
 
   return (
     <footer className="mt-16 border-t border-borda bg-superficie">
@@ -22,11 +24,11 @@ export async function Rodape() {
         <div>
           <span className="inline-block rounded-xl bg-(--logo-placa) px-1.5 py-1">
             <Image
-              src="/logo-gale.webp"
-              alt="Galé Super Atacado — 50 anos de tradição"
-              width={276}
-              height={256}
-              className="h-20 w-auto"
+              src={logo.src}
+              alt={logo.alt}
+              width={logo.largura}
+              height={logo.altura}
+              className="h-20 w-auto max-w-64 object-contain"
             />
           </span>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-suave">

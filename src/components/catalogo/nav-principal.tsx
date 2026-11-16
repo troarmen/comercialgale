@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CategoriaMenu } from "@/lib/catalogo";
+import type { LogoLoja } from "@/lib/vitrine";
 
 /**
  * Navegação principal do catálogo.
@@ -97,7 +98,14 @@ export function NavDesktop({ categorias }: { categorias: CategoriaMenu[] }) {
   );
 }
 
-export function MenuMovel({ categorias }: { categorias: CategoriaMenu[] }) {
+export function MenuMovel({
+  categorias,
+  logo,
+}: {
+  categorias: CategoriaMenu[];
+  /** O mesmo logo do cabeçalho (padrão ou o enviado pelo painel). */
+  logo: LogoLoja;
+}) {
   const [aberto, setAberto] = useState(false);
   const caminho = usePathname();
 
@@ -149,11 +157,11 @@ export function MenuMovel({ categorias }: { categorias: CategoriaMenu[] }) {
             <div className="flex items-center justify-between border-b border-borda px-4 py-3">
               <span className="rounded-lg bg-(--logo-placa) px-1 py-0.5">
                 <Image
-                  src="/logo-gale.webp"
-                  alt="Comercial Galé"
-                  width={276}
-                  height={256}
-                  className="h-12 w-auto"
+                  src={logo.src}
+                  alt={logo.alt}
+                  width={logo.largura}
+                  height={logo.altura}
+                  className="h-12 w-auto max-w-48 object-contain"
                 />
               </span>
               <button
