@@ -1,20 +1,21 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 export function BuscaPedidos() {
   const router = useRouter();
   const params = useSearchParams();
   const [, iniciar] = useTransition();
   const [termo, setTermo] = useState(params.get("busca") ?? "");
-  const primeira = useRef(true);
 
+  // Campo igual à URL = nada a aplicar. Isso cobre a montagem, inclusive a
+  // dupla do StrictMode em desenvolvimento: a antiga trava de "primeira
+  // renderização" não sobrevivia a ela, e abrir (ou voltar para)
+  // ?busca=x&pagina=2 caía na página 1. Mesma correção dos filtros de
+  // produtos e de clientes.
   useEffect(() => {
-    if (primeira.current) {
-      primeira.current = false;
-      return;
-    }
+    if (termo === (params.get("busca") ?? "")) return;
     const t = setTimeout(() => {
       const novo = new URLSearchParams(params.toString());
       if (termo) novo.set("busca", termo);
