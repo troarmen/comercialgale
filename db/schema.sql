@@ -114,7 +114,7 @@ create table public.clientes (
   -- Diferente de created_at, que marca a entrada da linha NESTE banco: na
   -- migração os 1.825 clientes entraram todos no mesmo dia, então só esta
   -- coluna responde "quantos clientes novos tivemos no mês".
-  cadastrado_em     date default current_date,
+  cadastrado_em     date default ((now() at time zone 'America/Sao_Paulo')::date),  -- migração 010
 
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
@@ -400,6 +400,9 @@ insert into public.configuracoes (chave, valor, descricao) values
   ('emails_notificacao',  '[]', 'Quem recebe cópia de cada pedido novo.'),
   ('catalogo_aviso',      '""', 'Aviso exibido no topo do catálogo.'),
   ('exibir_preco_varejo', 'true', 'Mostrar o preço de revenda sugerido ao lojista.');
+-- Chaves que NÃO estão no seed e nascem pelo painel (nov/2026), lidas no
+-- servidor com a service role: cadastro_aprovacao_automatica (ausente = ligada),
+-- vitrine_banners e vitrine_logo (tela Vitrine).
 
 create table public.log_atividades (
   id          bigint primary key generated always as identity,

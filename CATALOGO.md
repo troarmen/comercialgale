@@ -91,13 +91,21 @@ Supabase local expõe um Mailpit (SMTP `127.0.0.1:54325`, UI `:54324`).
 
 ## 5. Cadastro de lojista
 
-`/cadastro` grava direto em `clientes` com `status = 'incompleto'` via service
-role (a tabela não tem INSERT para anon, de propósito — o formulário é a única
-porta e valida no servidor). Honeypot contra robô; documento duplicado recebe
-mensagem amigável em vez de duplicar. A solicitação aparece no painel em
-Clientes, onde o Arthur aprova e cria o login — fluxo que o painel já tem.
-O lojista recebe "recebemos o seu cadastro" e a casa, o aviso para aprovar
-(§4).
+Desde nov/2026 (pedido do cliente, item 11): `/cadastro` pede também uma
+senha, valida CPF/CNPJ (inclusive o CNPJ alfanumérico de 2026), cria a ficha
+e o login com a service role e **entra na hora** → `/cadastro/bem-vindo`, já
+com preço. E-mails: boas-vindas ao lojista e aviso à casa (`emails_notificacao`).
+- Interruptor **Configurações → Liberar cadastro automaticamente**
+  (`cadastro_aprovacao_automatica`; ausente = ligado; erro de leitura =
+  desligado). Desligado: o login nasce, mas a ficha fica `incompleto` sem preço
+  até a equipe ativar.
+- **Ficha que já existe** (mesmo documento): com login → "use Esqueci minha
+  senha"; sem login e e-mail digitado IGUAL ao da ficha → cria o login sem
+  senha e manda o link de criar senha para esse e-mail (prova de posse; a senha
+  digitada é descartada); e-mail diferente, ficha inativa, preço suspenso ou
+  acesso revogado (registro em `log_atividades`) → WhatsApp da equipe.
+- Contra robô: honeypot + carimbo de tempo assinado (mín. 3 s, máx. 2 h) +
+  dígitos do documento. **Não há limite por IP** (sem infraestrutura).
 
 ## 6. SEO
 
@@ -268,3 +276,27 @@ Regras: **uma instância WebGL por página, no máximo**; vermelho de fundo
 sempre diluído (≤ 13% em CSS); nunca `object`/canvas acima de conteúdo
 clicável. Custo medido: chunk do three 532 KB / **131 KB gz**, carregado só
 no desktop e só depois do idle; nenhuma página além da home o referencia.
+
+
+## 12. Rodada de alterações do cliente (16/11/2026)
+
+Relatório "Site de Atacado Galé — Alterações solicitadas" (Arthur), 13 itens:
+
+| # | Pedido | Onde ficou |
+|---|---|---|
+| 1 | Busca não achava "Izitex" | `src/lib/busca.ts` (catálogo e painel) |
+| 2 | Produto perdia categoria e kit ao salvar | reset de formulário do React 19 → `useEnvio` em `src/components/cadastro-ui.tsx` (produto, cliente, cadastros) |
+| 3 | Negrito na descrição | `**trecho**` + `src/lib/descricao.tsx`; recuperar o antigo: `scripts/recuperar_negrito.py` (precisa do painel antigo no ar) |
+| 4 | E-mail do pedido em tabelas | `src/lib/email.ts` (Atacado e Varejo, < 60 KB com 80 linhas) |
+| 5 | Lista de produtos: cadastro, lançamento, ordenação, lote | `admin/(painel)/produtos/page.tsx` + migração 010 (datas do legado) |
+| 6 | Lista de clientes: data de cadastro | `admin/(painel)/clientes/page.tsx` |
+| 7 | Duplicar produto | `/admin/produtos/novo?de=<id>` (sem fotos; ref. nova obrigatória) |
+| 8 | Botão Voltar com a lista como estava | `src/components/voltar.tsx` |
+| 9 | Banners em loop no topo | tela **Vitrine** + `carrossel-banners.tsx`; sem banner = topo antigo |
+| 10 | Trocar o logo | tela **Vitrine** |
+| 11 | Cadastro com aprovação automática | §5 |
+| 12 | A–Z pela marca | `listarProdutos` ordem `nome` = `fabricantes(nome)` |
+| 13 | Zoom na foto | `visualizador-foto.tsx` (fotos são 800×800: zoom acima disso perde nitidez) |
+
+Login LOCAL de admin para QA (só no Supabase local): `admin@teste.local` /
+`gale-admin-local-2026`.

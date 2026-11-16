@@ -65,10 +65,15 @@ Notas que economizam tempo:
   `grade` (4P/4M/4G) e `cor` (TU - Branco). A coluna `tipo` separa. No painel
   isso vira `<optgroup>`; no catálogo, decida como apresentar.
 - **`produtos.busca`** é um `tsvector` mantido por trigger (título e modelo com
-  peso A, tags B, descrição C). Use para a busca do catálogo em vez de `ilike`.
-- **`produtos.descricao`** contém quebras de parágrafo (`\n\n`) de verdade.
-  **Renderize com `white-space: pre-line`** ou equivalente, senão vira bloco
-  corrido. (As entidades HTML do legado — 1.239 `&nbsp;` — já foram limpas;
+  peso A, tags B, descrição C). **Desde nov/2026 a busca do catálogo e do
+  painel NÃO usa mais essa coluna**: ela não tem o nome da marca ("Izitex" dava
+  0), exige palavra inteira e sensível a acento, e o radical do português junta
+  "calca" com "calcinhas". A busca vive em `src/lib/busca.ts` (regex sem acento
+  por palavra + marca/categoria/subcategoria). A coluna continua mantida.
+- **`produtos.descricao`** contém quebras de parágrafo (`\n\n`) de verdade e,
+  desde nov/2026, **negrito como `**trecho**`** (botão Negrito no editor).
+  **Exiba sempre com `DescricaoFormatada`** e use `textoPuro` onde vira texto
+  puro (meta, JSON-LD, e-mail) — ambos em `src/lib/descricao.tsx`. Nunca HTML. (As entidades HTML do legado — 1.239 `&nbsp;` — já foram limpas;
   veja `scripts/limpar_descricoes.py`.)
 - **`pedido_itens`** guarda **cópia congelada** de título, modelo, tamanho e
   preços. Produto renomeado ou excluído depois não corrompe o histórico.
@@ -76,6 +81,12 @@ Notas que economizam tempo:
 - **`configuracoes`** é chave/valor JSON. Três chaves são legíveis
   publicamente: `pedido_minimo_valor` (hoje R$ 500), `catalogo_aviso`,
   `exibir_preco_varejo`. **`emails_notificacao` não é** — só o painel lê.
+  Chaves que nascem pelo painel (sem linha no seed), lidas no servidor com a
+  service role, restritas por código à própria chave:
+  `cadastro_aprovacao_automatica` (ausente = ligada; erro de leitura =
+  desligada) em `src/app/(catalogo)/cadastro/servidor.ts`, e `vitrine_banners`
+  / `vitrine_logo` (tela Vitrine; arquivos no bucket `produtos` sob `vitrine/`)
+  em `src/lib/vitrine.ts`.
 
 ---
 
@@ -252,8 +263,10 @@ Nada disso existe hoje — `src/app/page.tsx` é um placeholder.
    (use `produtos.busca`).
 2. **Ficha do produto** com fotos, descrição, grade de tamanhos e preço
    **quando houver login liberado**.
-3. **Login do cliente** (Supabase Auth; o Arthur cria o usuário pelo painel —
-   não há auto-cadastro com acesso imediato).
+3. **Login do cliente** (Supabase Auth). Desde nov/2026 o cadastro do site
+   cria o login com senha e libera na hora (interruptor em Configurações);
+   ficha antiga sem login só entra pelo link enviado ao e-mail da ficha. O
+   botão "Criar login e enviar convite" fica para quem a equipe cadastra.
 4. **Carrinho** — provavelmente estado local/cookie. Se guardar
    `produto_tamanho_id`, saiba que esse id é estável: o painel atualiza a grade
    no lugar, sem recriar linhas.
@@ -290,6 +303,7 @@ Onde o catálogo encosta no painel, e pode precisar que ele seja complementado:
 | 007 | `is_equipe()` + SELECT em `pedidos`/`pedido_itens` para a equipe |
 | 008 | `mudar_status_pedido()`: colaborador muda SÓ a situação do pedido, com log |
 | 009 | `link_senha_liberado()`: trava de 60 s por e-mail para o link de senha |
+| 010 | **PENDENTE em produção (nov/2026)**: data real de cadastro dos produtos do legado em `created_at` (com backup e reversão no cabeçalho) + `clientes.cadastrado_em` com default e sem nulos. O código funciona com ou sem ela |
 
 Não há CLI de migração: o SQL é rodado à mão no SQL Editor do Supabase.
 Escreva migração nova como arquivo numerado, dentro de `begin; ... commit;`.
