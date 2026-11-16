@@ -43,6 +43,8 @@ export default async function PaginaConfiguracoes() {
         emails={comoLista(mapa.get("emails_notificacao"))}
         aviso={comoTexto(mapa.get("catalogo_aviso"))}
         exibirVarejo={comoBooleano(mapa.get("exibir_preco_varejo"))}
+        // Ausente = ligada: é o padrão do cadastro (ver cadastro/servidor.ts).
+        cadastroAutomatico={comoBooleano(mapa.get("cadastro_aprovacao_automatica"))}
       />
     </div>
   );

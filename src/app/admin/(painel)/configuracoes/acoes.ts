@@ -51,6 +51,7 @@ export async function salvarConfiguracoes(
   }
 
   const exibirVarejo = form.get("exibir_preco_varejo") === "on";
+  const cadastroAutomatico = form.get("cadastro_aprovacao_automatica") === "on";
 
   const valores: Record<string, unknown> = {
     pedido_minimo_valor: minimo,
@@ -59,15 +60,35 @@ export async function salvarConfiguracoes(
     exibir_preco_varejo: exibirVarejo,
   };
 
+  const agora = new Date().toISOString();
   for (const [chave, valor] of Object.entries(valores)) {
     const { error } = await supabase
       .from("configuracoes")
-      .update({ valor: valor as never, updated_at: new Date().toISOString() })
+      .update({ valor: valor as never, updated_at: agora })
       .eq("chave", chave);
 
     if (error) {
       return { erro: `Não foi possível salvar "${chave}": ${error.message}` };
     }
+  }
+
+  // Chave nova (nov/2026): o banco de produção não tem a linha até alguém
+  // salvar esta tela, e UPDATE em linha que não existe afeta 0 linhas sem
+  // erro — por isso upsert. Sem migração: ausente, o cadastro lê LIGADA.
+  const { error: erroCadastro } = await supabase.from("configuracoes").upsert(
+    {
+      chave: "cadastro_aprovacao_automatica",
+      valor: cadastroAutomatico,
+      descricao:
+        "Cadastro pelo site já sai com preço liberado (true) ou aguarda a equipe ativar na ficha (false).",
+      updated_at: agora,
+    },
+    { onConflict: "chave" },
+  );
+  if (erroCadastro) {
+    return {
+      erro: `Não foi possível salvar "cadastro_aprovacao_automatica": ${erroCadastro.message}`,
+    };
   }
 
   revalidatePath("/admin/configuracoes");
