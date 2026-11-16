@@ -35,12 +35,15 @@ export function GerenciarAcesso({
     link?: string;
   } | null>(null);
   const [emailNovo, setEmailNovo] = useState(email ?? "");
+  // Com login, o endereço para onde o link foi volta da action (é o do
+  // login, que numa ficha "a@x; b@y" pode ser qualquer um dos dois).
+  const [enviadoPara, setEnviadoPara] = useState<string | null>(null);
 
   if (convite) {
     return (
       <ResultadoConvite
         titulo={convite.titulo}
-        email={emailNovo || email || ""}
+        email={(temLogin ? enviadoPara : emailNovo) ?? ""}
         emailEnviado={convite.emailEnviado}
         link={convite.link}
         aoFechar={() => setConvite(null)}
@@ -137,12 +140,13 @@ export function GerenciarAcesso({
       <div className="mt-3 flex flex-col gap-2">
         <button
           type="button"
-          disabled={pendente || !email}
+          disabled={pendente}
           onClick={() =>
             iniciar(async () => {
-              const r = await reenviarSenha(email!);
+              const r = await reenviarSenha(clienteId);
               setErro(r.erro ?? null);
               if (r.ok) {
+                setEnviadoPara(r.para ?? null);
                 setConvite({
                   titulo: "Link enviado",
                   emailEnviado: r.emailEnviado ?? false,
@@ -161,7 +165,7 @@ export function GerenciarAcesso({
           onClick={() => {
             if (
               !confirm(
-                "Revogar o acesso deste cliente?\n\nO cadastro e todos os pedidos continuam salvos — só o login é removido. Ele volta a navegar sem ver preço.",
+                "Revogar o acesso deste cliente?\n\nO cadastro e todos os pedidos continuam salvos — só o login é removido. Ele volta a navegar sem ver preço e não consegue se liberar sozinho pelo cadastro do site. Para devolver o acesso, use \"Criar login e enviar convite\" aqui na ficha.",
               )
             )
               return;

@@ -14,6 +14,8 @@ export type Resultado = {
   /** false = o e-mail não saiu; `link` vem junto para o Arthur repassar. */
   emailEnviado?: boolean;
   link?: string;
+  /** Endereço para onde o link foi (o do login, que pode não ser o 1º da ficha). */
+  para?: string;
 };
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
@@ -197,22 +199,31 @@ export async function revogarAcesso(clienteId: number): Promise<Resultado> {
 
   if (!cliente?.user_id) return { erro: "Este cliente não tem login." };
 
-  const admin = criarClienteAdmin();
-  const { error } = await admin.auth.admin.deleteUser(cliente.user_id);
-  if (error) return { erro: error.message };
-
-  // O cadastro e o histórico de pedidos permanecem; só o acesso sai.
-  await sessao.supabase
-    .from("clientes")
-    .update({ user_id: null })
-    .eq("id", clienteId);
-
-  await sessao.supabase.from("log_atividades").insert({
+  // O registro vai ANTES de apagar o login, e sem ele nada acontece: depois
+  // da revogação a ficha fica Ativa e sem login, igual a uma ficha antiga, e
+  // é este registro que impede o /cadastro do site de devolver o acesso
+  // sozinho (ver vincularFichaAntiga em cadastro/acoes.ts).
+  const { error: erroLog } = await sessao.supabase.from("log_atividades").insert({
     user_id: sessao.user.id,
     acao: "excluiu",
     entidade: "acesso_cliente",
     entidade_id: String(clienteId),
   });
+  if (erroLog) return { erro: `Não foi possível registrar a revogação (${erroLog.message}). Nada foi alterado.` };
+
+  const admin = criarClienteAdmin();
+  const { error } = await admin.auth.admin.deleteUser(cliente.user_id);
+  if (error) return { erro: error.message };
+
+  // O cadastro e o histórico de pedidos permanecem; só o acesso sai.
+  const { error: erroFicha } = await sessao.supabase
+    .from("clientes")
+    .update({ user_id: null })
+    .eq("id", clienteId);
+  if (erroFicha) {
+    revalidar(clienteId);
+    return { erro: `O login foi removido, mas a ficha não foi atualizada: ${erroFicha.message}` };
+  }
 
   revalidar(clienteId);
   return { ok: true };
@@ -224,14 +235,27 @@ export async function revogarAcesso(clienteId: number): Promise<Resultado> {
  * Não usa resetPasswordForEmail: com PKCE, o link só funcionaria no navegador
  * de quem pediu — o do Arthur. Ver src/lib/links-senha.ts.
  */
-export async function reenviarSenha(email: string): Promise<Resultado> {
+export async function reenviarSenha(clienteId: number): Promise<Resultado> {
   const sessao = await exigirAdmin();
   if (!sessao) return { erro: "Sessão expirada. Entre novamente." };
+
+  // O endereço vem do LOGIN, não do campo E-mail da ficha: ficha antiga pode
+  // ter dois endereços ("a@x; b@y"), e o cadastro do site cria o login com o
+  // que a pessoa digitou — que pode ser o segundo.
+  const { data: cliente } = await sessao.supabase
+    .from("clientes")
+    .select("user_id")
+    .eq("id", clienteId)
+    .single();
+  if (!cliente?.user_id) return { erro: "Este cliente não tem login." };
+  const { data: usuario } = await criarClienteAdmin().auth.admin.getUserById(cliente.user_id);
+  const email = usuario.user?.email;
+  if (!email) return { erro: "Não encontramos o login deste cliente." };
 
   if (!(await linkSenhaLiberado(email))) {
     return { erro: "Um link foi enviado há menos de 1 minuto. Aguarde um pouco." };
   }
   const convite = await convidarComLink(email, "redefinir");
   if ("erro" in convite) return { erro: "Não encontramos login com este e-mail." };
-  return { ok: true, ...convite };
+  return { ok: true, para: email, ...convite };
 }
