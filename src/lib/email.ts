@@ -66,6 +66,17 @@ function remetente() {
 // condicional só do Outlook, cores repetidas em `bgcolor`. E todo texto que
 // vem do banco ou do formulário passa por esc() — nome de loja com "<" ou
 // observação com HTML colado não pode virar marcação no e-mail da casa.
+//
+// Exceção de propósito nas TABELAS DE ITENS, que crescem com o pedido: as
+// células não levam `style`. A fonte vai uma vez só na <table> (Gmail e Apple
+// Mail herdam; o Outlook, que não herda, recebe a mesma regra por um <style>
+// que só ele lê, no <head>), o espaçamento vem do `cellpadding` e as linhas
+// se separam por faixas alternadas em `bgcolor` no <tr> — atributo que todo
+// cliente respeita, ao contrário de borda, que teria de ir em cada célula.
+// Repetir o estilo inteiro em cada <td> custava ~1,2 KB por linha, e o Gmail
+// corta a mensagem acima de 102 KB: pedido com ~40 linhas (produto ×
+// tamanho) chegava com a tabela de Varejo escondida atrás de "Ver mensagem
+// inteira". Assim, a linha fica em ~0,3 KB.
 
 const COR = {
   marca: "#d12437",
@@ -135,6 +146,7 @@ function moldura({
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="x-apple-disable-message-reformatting">
 <title>${esc(titulo)}</title>
+<!--[if mso]><style>table,td,th,h1,h2,p,span,a{font-family:${FONTE};}.itens td{font-size:13px;line-height:1.4;color:${COR.texto};}</style><![endif]-->
 </head>
 <body style="margin:0;padding:0;background-color:${COR.fundo};">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${COR.fundo};">${esc(previa)}</div>
@@ -318,29 +330,27 @@ function tabelaItensHtml(pedido: PedidoParaEmail, tabela: Tabela) {
   // colunas, e cada letra a mais no cabeçalho sai da coluna do produto.
   const th = (texto: string, alinhar: "left" | "right" | "center" = "left", largura = "") =>
     `<th align="${alinhar}"${largura ? ` width="${largura}"` : ""} style="padding:8px 5px;font-family:${FONTE};font-size:11px;font-weight:bold;color:${COR.suave};border-bottom:1px solid ${COR.borda};">${texto}</th>`;
-  const td = (html: string, alinhar: "left" | "right" | "center" = "left", extra = "") =>
-    `<td align="${alinhar}" valign="top" style="padding:8px 5px;font-family:${FONTE};font-size:13px;line-height:1.4;color:${COR.texto};border-bottom:1px solid ${COR.borda};${extra}">${html}</td>`;
+  // Célula de item SEM style (ver o topo do arquivo): só atributo, e só
+  // quando muda alguma coisa.
+  const td = (html: string, attrs = "") => `<td${attrs}>${html}</td>`;
 
   const linhas = pedido.itens
-    .map((i) => {
+    .map((i, n) => {
       const preco = precoDoItem(i, tabela);
-      return `<tr>
-${td(
-  `${esc(i.titulo)}<br><span style="font-size:11px;color:${COR.suave};">Emb. com ${esc(plural(i.pecasNoKit, "peça", "peças"))} · ${esc(reais(preco))} cada</span>`,
-)}
-${td(esc(i.modelo))}
-${td(esc(i.marca ?? "—"))}
-${td(esc(i.tamanho ?? "—"), "center")}
-${td(String(i.qtdKits), "center")}
-${td(valor(i.qtdKits * preco), "right", "white-space:nowrap;")}
-</tr>`;
+      // Faixa alternada no lugar da linha divisória.
+      return `<tr valign="top"${n % 2 ? ` bgcolor="${COR.fundo}"` : ""}>${td(
+        `${esc(i.titulo)}<br><span style="font-size:11px;color:${COR.suave}">Emb. com ${esc(plural(i.pecasNoKit, "peça", "peças"))} · ${esc(reais(preco))} cada</span>`,
+      )}${td(esc(i.modelo))}${td(esc(i.marca ?? "—"))}${td(esc(i.tamanho ?? "—"), ' align="center"')}${td(
+        String(i.qtdKits),
+        ' align="center"',
+      )}${td(valor(i.qtdKits * preco), ' align="right" nowrap')}</tr>`;
     })
     .join("\n");
 
   const total = tabela === "atacado" ? pedido.totalAtacado : pedido.totalVarejo;
 
   return `${h2(cfg.titulo, cfg.apoio)}
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid ${COR.borda};">
+<table class="itens" width="100%" cellpadding="6" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid ${COR.borda};font-family:${FONTE};font-size:13px;line-height:1.4;color:${COR.texto};">
 <tr bgcolor="${COR.cabecalho}" style="background-color:${COR.cabecalho};">
 ${th("Produto", "left", "38%")}${th("Ref")}${th("Marca")}${th("Tamanho", "center")}${th("Qtd<br>(emb.)", "center")}${th("Valor<br>(R$)", "right")}
 </tr>
