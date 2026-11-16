@@ -2,29 +2,49 @@ import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
 import { arvoreCategorias, configPublica, sessaoCatalogo } from "@/lib/catalogo";
+import { logoDaLoja, type LogoLoja } from "@/lib/vitrine";
 import { BuscaGlobal } from "./busca-global";
 import { CarrinhoBotao } from "./carrinho-botao";
 import { MenuMovel, NavDesktop } from "./nav-principal";
 
 /**
- * Logotipo oficial da Galé — edição 50 anos (coração + faixa "50 ANOS · 2026").
+ * Logotipo da loja. Por padrão, o oficial da Galé — edição 50 anos (coração +
+ * faixa "50 ANOS · 2026"), em /public; a equipe pode trocar pelo painel
+ * (Vitrine), e aí vem de `logoDaLoja()` com largura e altura reais, para o
+ * espaço ser reservado antes de a imagem chegar.
+ *
+ * `max-w` + `min-w-0` + `object-contain`: um logo novo bem mais largo que o
+ * quadradinho de hoje encolhe dentro da faixa (até caber ao lado do menu, da
+ * conta e do carrinho num celular de 320 px) em vez de empurrar a página para
+ * os lados. O logo padrão é estreito e não encolhe nunca.
+ *
  * O arquivo tem texto carvão sobre fundo transparente; no tema escuro a
  * `--logo-placa` pinta uma placa branca atrás para ele continuar legível.
  */
-export function MarcaCatalogo({ compacta = false }: { compacta?: boolean }) {
+export function MarcaCatalogo({
+  logo,
+  compacta = false,
+}: {
+  logo: LogoLoja;
+  compacta?: boolean;
+}) {
   return (
     <Link
       href="/"
       aria-label="Comercial Galé — página inicial"
-      className="shrink-0 rounded-xl bg-(--logo-placa) px-1.5 py-1 transition hover:opacity-90"
+      className="min-w-0 rounded-xl bg-(--logo-placa) px-1.5 py-1 transition hover:opacity-90"
     >
       <Image
-        src="/logo-gale.webp"
-        alt="Galé Super Atacado — 50 anos de tradição"
-        width={276}
-        height={256}
+        src={logo.src}
+        alt={logo.alt}
+        width={logo.largura}
+        height={logo.altura}
         priority
-        className={compacta ? "h-12 w-auto" : "h-14 w-auto sm:h-16"}
+        className={`object-contain ${
+          compacta
+            ? "h-12 w-auto max-w-[min(100%,10rem)]"
+            : "h-14 w-auto max-w-[min(100%,10rem)] sm:h-16 sm:max-w-[min(100%,15rem)]"
+        }`}
       />
     </Link>
   );
@@ -78,9 +98,10 @@ async function AreaConta() {
 }
 
 export async function Cabecalho() {
-  const [categorias, config] = await Promise.all([
+  const [categorias, config, logo] = await Promise.all([
     arvoreCategorias(),
     configPublica(),
+    logoDaLoja(),
   ]);
 
   return (
@@ -92,8 +113,8 @@ export async function Cabecalho() {
       )}
 
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
-        <MenuMovel categorias={categorias} />
-        <MarcaCatalogo />
+        <MenuMovel categorias={categorias} logo={logo} />
+        <MarcaCatalogo logo={logo} />
 
         <div className="hidden flex-1 justify-center px-4 md:flex">
           {/* useSearchParams exige um limite de Suspense fora de página dinâmica */}

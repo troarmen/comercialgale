@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { CarrosselBanners } from "@/components/catalogo/carrossel-banners";
 import { CartaoProduto, GradeProdutos } from "@/components/catalogo/cartao-produto";
 import { BrilhoMarca, PadraoPontos } from "@/components/catalogo/decorativos";
 import { FundoLiquidoLazy } from "@/components/catalogo/fundo-liquido-lazy";
@@ -18,6 +19,7 @@ import {
 import { CONTATO } from "@/lib/contato";
 import { numero, reais, urlFoto } from "@/lib/formato";
 import { linkWhatsApp } from "@/lib/seo";
+import { bannersDaLoja } from "@/lib/vitrine";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -50,6 +52,9 @@ const PASSOS = [
 ];
 
 export default async function PaginaInicial() {
+  // Banners do painel (Vitrine). Sai junto com as consultas abaixo; com um ou
+  // mais ativos, o topo vira carrossel no lugar do banner padrão.
+  const promessaBanners = bannersDaLoja();
   const [categorias, lancamentos, marcas, config, totalProdutos, { cliente }] =
     await Promise.all([
       arvoreCategorias(),
@@ -99,12 +104,18 @@ export default async function PaginaInicial() {
     "meia-soquete-feminina-mf-307",
   ];
 
-  const escolhidos = (await Promise.all(HERO_SLUGS.map(produtoPorSlug)))
-    .map((p) => ({ foto: p?.produto_imagens[0] }))
-    .filter((d) => d.foto);
+  const banners = await promessaBanners;
+  const comBanners = banners.length > 0;
+
+  // Com banner do painel no topo, as fotos do banner padrão nem são buscadas.
+  const escolhidos = comBanners
+    ? []
+    : (await Promise.all(HERO_SLUGS.map(produtoPorSlug)))
+        .map((p) => ({ foto: p?.produto_imagens[0] }))
+        .filter((d) => d.foto);
 
   const destaqueFotos =
-    escolhidos.length >= 3
+    comBanners || escolhidos.length >= 3
       ? escolhidos
       : (await listarProdutos({ porPagina: 12, ordem: "destaques" })).produtos
           .map((p) => ({
@@ -147,97 +158,111 @@ export default async function PaginaInicial() {
   return (
     <>
       {/* ------------------------------------------------- banner principal */}
-      {/*
-        Fundo em duas camadas que se substituem, não se somam: a aurora em CSS
-        pinta no primeiro quadro para todo mundo; o fluido pixelizado entra só
-        no desktop com ponteiro, depois do idle, mascarado para longe do texto.
-      */}
-      <section className="fundo-aurora relative overflow-hidden border-b border-borda bg-superficie">
-        <FundoLiquidoLazy className="liquido-mascara" />
-
-        <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-10 lg:grid-cols-[1.1fr_1fr] lg:py-14">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-acento-texto">
-              Super atacado de moda íntima · 50 anos
-            </p>
-            <h1 className="mt-3 max-w-xl text-3xl font-bold leading-tight tracking-tight text-texto sm:text-5xl">
-              Lingerie, meias, cuecas e pijamas para abastecer a sua loja
-            </h1>
-            <p className="mt-4 max-w-lg text-base leading-relaxed text-suave">
-              {numero(totalProdutos)} produtos direto da {CONTATO.endereco.regiao},
-              em São Paulo — com preço de Atacado e de Varejo para a sua margem.
-            </p>
-
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <Link
-                href="/produtos"
-                className="flex h-12 items-center rounded-full bg-acento px-6 text-sm font-semibold text-white shadow-cta transition duration-200 hover:-translate-y-0.5 hover:bg-acento-forte"
-              >
-                Ver catálogo
-              </Link>
-              {!clienteAtivo && (
-                <Link
-                  href="/cadastro"
-                  className="flex h-12 items-center rounded-full border border-borda-forte bg-superficie px-6 text-sm font-semibold text-texto transition duration-200 hover:-translate-y-0.5 hover:border-texto hover:shadow-pousada"
-                >
-                  Quero comprar no atacado
-                </Link>
-              )}
-            </div>
-
-            <p className="mt-4 text-sm text-suave">
-              Venda em embalagens fechadas
-              {config.pedidoMinimo > 0 &&
-                ` · compras no atacado a partir de ${reais(config.pedidoMinimo)}`}
-            </p>
-          </div>
-
-          {/* Composição em camadas: fotos empilhadas como volumes de estoque.
-              Só no desktop — no celular o banner é texto e a vitrine vem logo. */}
-          {destaqueFotos.length >= 3 && (
-            <div className="relative hidden h-[380px] lg:block" aria-hidden="true">
-              <div className="absolute left-0 top-12 w-44 -rotate-6 overflow-hidden rounded-2xl bg-white shadow-suave ring-1 ring-borda">
-                <div className="relative aspect-square">
-                  <Image
-                    src={urlFoto(destaqueFotos[1].foto!.storage_path)!}
-                    alt=""
-                    fill
-                    sizes="176px"
-                    priority
-                    className="object-contain p-2"
-                  />
-                </div>
-              </div>
-
-              <div className="absolute left-1/2 top-0 z-10 w-60 -translate-x-1/2 rotate-1 overflow-hidden rounded-3xl bg-white shadow-flutuante ring-1 ring-borda">
-                <div className="relative aspect-square">
-                  <Image
-                    src={urlFoto(destaqueFotos[0].foto!.storage_path)!}
-                    alt=""
-                    fill
-                    sizes="240px"
-                    priority
-                    className="object-contain p-2"
-                  />
-                </div>
-              </div>
-
-              <div className="absolute right-0 top-32 w-40 rotate-6 overflow-hidden rounded-2xl bg-white shadow-suave ring-1 ring-borda">
-                <div className="relative aspect-square">
-                  <Image
-                    src={urlFoto(destaqueFotos[2].foto!.storage_path)!}
-                    alt=""
-                    fill
-                    sizes="160px"
-                    priority
-                    className="object-contain p-2"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
+      {comBanners ? (
+        /*
+          Banners do painel (Vitrine). O h1 da página continua existindo, só
+          que para leitor de tela e buscador: a arte do banner é imagem, e a
+          página não pode ficar sem título principal.
+        */
+        <div className="mx-auto max-w-7xl px-4 pt-4 sm:pt-6">
+          <h1 className="sr-only">
+            Lingerie, meias, cuecas e pijamas para abastecer a sua loja
+          </h1>
+          <CarrosselBanners banners={banners} />
         </div>
-      </section>
+      ) : (
+        /*
+          Fundo em duas camadas que se substituem, não se somam: a aurora em CSS
+          pinta no primeiro quadro para todo mundo; o fluido pixelizado entra só
+          no desktop com ponteiro, depois do idle, mascarado para longe do texto.
+        */
+        <section className="fundo-aurora relative overflow-hidden border-b border-borda bg-superficie">
+          <FundoLiquidoLazy className="liquido-mascara" />
+
+          <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-10 lg:grid-cols-[1.1fr_1fr] lg:py-14">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-acento-texto">
+                Super atacado de moda íntima · 50 anos
+              </p>
+              <h1 className="mt-3 max-w-xl text-3xl font-bold leading-tight tracking-tight text-texto sm:text-5xl">
+                Lingerie, meias, cuecas e pijamas para abastecer a sua loja
+              </h1>
+              <p className="mt-4 max-w-lg text-base leading-relaxed text-suave">
+                {numero(totalProdutos)} produtos direto da {CONTATO.endereco.regiao},
+                em São Paulo — com preço de Atacado e de Varejo para a sua margem.
+              </p>
+
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <Link
+                  href="/produtos"
+                  className="flex h-12 items-center rounded-full bg-acento px-6 text-sm font-semibold text-white shadow-cta transition duration-200 hover:-translate-y-0.5 hover:bg-acento-forte"
+                >
+                  Ver catálogo
+                </Link>
+                {!clienteAtivo && (
+                  <Link
+                    href="/cadastro"
+                    className="flex h-12 items-center rounded-full border border-borda-forte bg-superficie px-6 text-sm font-semibold text-texto transition duration-200 hover:-translate-y-0.5 hover:border-texto hover:shadow-pousada"
+                  >
+                    Quero comprar no atacado
+                  </Link>
+                )}
+              </div>
+
+              <p className="mt-4 text-sm text-suave">
+                Venda em embalagens fechadas
+                {config.pedidoMinimo > 0 &&
+                  ` · compras no atacado a partir de ${reais(config.pedidoMinimo)}`}
+              </p>
+            </div>
+
+            {/* Composição em camadas: fotos empilhadas como volumes de estoque.
+                Só no desktop — no celular o banner é texto e a vitrine vem logo. */}
+            {destaqueFotos.length >= 3 && (
+              <div className="relative hidden h-[380px] lg:block" aria-hidden="true">
+                <div className="absolute left-0 top-12 w-44 -rotate-6 overflow-hidden rounded-2xl bg-white shadow-suave ring-1 ring-borda">
+                  <div className="relative aspect-square">
+                    <Image
+                      src={urlFoto(destaqueFotos[1].foto!.storage_path)!}
+                      alt=""
+                      fill
+                      sizes="176px"
+                      priority
+                      className="object-contain p-2"
+                    />
+                  </div>
+                </div>
+
+                <div className="absolute left-1/2 top-0 z-10 w-60 -translate-x-1/2 rotate-1 overflow-hidden rounded-3xl bg-white shadow-flutuante ring-1 ring-borda">
+                  <div className="relative aspect-square">
+                    <Image
+                      src={urlFoto(destaqueFotos[0].foto!.storage_path)!}
+                      alt=""
+                      fill
+                      sizes="240px"
+                      priority
+                      className="object-contain p-2"
+                    />
+                  </div>
+                </div>
+
+                <div className="absolute right-0 top-32 w-40 rotate-6 overflow-hidden rounded-2xl bg-white shadow-suave ring-1 ring-borda">
+                  <div className="relative aspect-square">
+                    <Image
+                      src={urlFoto(destaqueFotos[2].foto!.storage_path)!}
+                      alt=""
+                      fill
+                      sizes="160px"
+                      priority
+                      className="object-contain p-2"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ----------------------------------------------------- mini banners */}
       <section className="mx-auto max-w-7xl px-4 pt-6" aria-label="Atalhos">
