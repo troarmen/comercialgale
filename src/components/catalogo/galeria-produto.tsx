@@ -33,8 +33,13 @@ export function GaleriaProduto({ fotos, titulo }: { fotos: Foto[]; titulo: strin
   const foto = fotos[indice];
   const descricao = foto.alt ?? titulo;
 
+  // min-w-0: a galeria é item do grid da ficha e, no celular (coluna única
+  // "auto"), o min-width:auto do item fazia a coluna esticar até caber a faixa
+  // de miniaturas inteira — com 6 fotos ou mais a página passava da tela e o
+  // visualizador abria cortado. Assim a faixa fica na largura da coluna e rola
+  // por dentro.
   return (
-    <div>
+    <div className="min-w-0">
       <button
         ref={fotoRef}
         type="button"
