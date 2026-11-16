@@ -147,8 +147,10 @@ export function Interruptor({
   return (
     <label className="flex cursor-pointer items-center gap-2.5">
       <input type="checkbox" name={nome} defaultChecked={marcado} className="peer sr-only" />
-      <span className="relative h-6 w-11 rounded-full bg-borda-forte transition peer-checked:bg-acento">
-        <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition peer-checked:translate-x-5" />
+      {/* A bolinha não é irmã do input, então o peer-checked vai no trilho
+          (que é) e alcança a bolinha pelo [&>span]. */}
+      <span className="relative h-6 w-11 rounded-full bg-borda-forte transition peer-checked:bg-acento peer-checked:[&>span]:translate-x-5 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-gale-500">
+        <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition" />
       </span>
       <span className="text-sm">{rotulo}</span>
     </label>
