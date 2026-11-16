@@ -498,7 +498,12 @@ export async function enviarEmailsDePedido(
 
 // ------------------------------------------------------------- link de senha
 
-export type MotivoLinkSenha = "redefinir" | "acesso_liberado" | "convite_equipe";
+/**
+ * `acesso_criado`: ficha antiga que pediu o login pelo site com a liberação
+ * automática DESLIGADA — o login existe, mas o preço espera a equipe. Não dá
+ * para mandar o "acesso_liberado" ("seu cadastro foi aprovado") nesse caso.
+ */
+export type MotivoLinkSenha = "redefinir" | "acesso_liberado" | "acesso_criado" | "convite_equipe";
 
 const TEXTO_LINK: Record<MotivoLinkSenha, { assunto: string; abertura: string }> = {
   redefinir: {
@@ -510,6 +515,11 @@ const TEXTO_LINK: Record<MotivoLinkSenha, { assunto: string; abertura: string }>
     assunto: "Seu acesso à Comercial Galé foi liberado",
     abertura:
       "Seu cadastro foi aprovado! Com o login você vê os preços de atacado e fecha pedidos pelo site. Para começar, crie a sua senha pelo link abaixo.",
+  },
+  acesso_criado: {
+    assunto: "Seu login na Comercial Galé foi criado",
+    abertura:
+      "Encontramos o cadastro da sua loja e criamos o seu login. Os preços de atacado aparecem assim que a nossa equipe liberar a loja — avisamos por e-mail. Para começar, crie a sua senha pelo link abaixo.",
   },
   convite_equipe: {
     assunto: "Seu acesso ao painel da Comercial Galé",
@@ -594,11 +604,22 @@ export type CadastroParaEmail = {
   uf: string | null;
 };
 
+/** O que mudou numa ficha antiga que ganhou login pelo site. */
+export type MudancasNaFicha = {
+  /** estava 'incompleto' e a liberação automática a passou para 'ativo' */
+  passouParaAtivo: boolean;
+  /** nome como está na FICHA — o digitado no site pode ser outro */
+  nomeDaFicha: string;
+};
+
 export type ContextoCadastro = {
-  /** true = já vê preço (aprovação automática); false = aguarda a equipe. */
+  /** true = vê preço (aprovação automática); false = aguarda a equipe. */
   liberado: boolean;
-  /** true = a ficha já existia (cliente antigo) e só ganhou o login agora. */
-  fichaExistente: boolean;
+  /**
+   * false = cliente novo. Objeto = a ficha já existia (cliente antigo ou
+   * pedido de cadastro antigo) e só ganhou o login agora — com o que mudou.
+   */
+  fichaExistente: false | MudancasNaFicha;
   pedidoMinimo: number;
   exibirVarejo: boolean;
 };
@@ -606,18 +627,15 @@ export type ContextoCadastro = {
 /** Como o site funciona, para o e-mail de boas-vindas. Texto já escapado. */
 function comoFunciona(ctx: ContextoCadastro) {
   const site = urlDosLinks();
+  const precos = ctx.exibirVarejo
+    ? "cada produto mostra o preço de <strong>Atacado</strong> (o seu preço de lojista) e o de <strong>Varejo</strong> (preço de revenda ao consumidor)."
+    : "cada produto mostra o preço de <strong>Atacado</strong>, o seu preço de lojista.";
   return [
     ctx.liberado
-      ? {
-          titulo: "Os preços já estão liberados",
-          texto: ctx.exibirVarejo
-            ? "Com o login, cada produto mostra o preço de <strong>Atacado</strong> (o seu preço de lojista) e o de <strong>Varejo</strong> (preço de revenda ao consumidor)."
-            : "Com o login, cada produto mostra o preço de <strong>Atacado</strong>, o seu preço de lojista.",
-        }
+      ? { titulo: "Os preços já estão liberados", texto: `Com o login, ${precos}` }
       : {
           titulo: "Os preços aparecem quando a equipe liberar",
-          texto:
-            "O seu login já funciona. Assim que a nossa equipe conferir os dados, os preços passam a aparecer no site — avisamos por e-mail.",
+          texto: `O seu login já funciona. Assim que a nossa equipe conferir os dados, os preços passam a aparecer no site — avisamos por e-mail.`,
         },
     {
       titulo: "Venda por embalagem fechada",
@@ -650,6 +668,15 @@ function comoFunciona(ctx: ContextoCadastro) {
   ];
 }
 
+function faleComAGenteHtml() {
+  return `${h2("Fale com a gente")}
+${paragrafo(`WhatsApp <strong>${esc(CONTATO.whatsapp)}</strong> · ${link(`mailto:${CONTATO.email}`, CONTATO.email)}<br><span style="color:${COR.suave};">${esc(CONTATO.horario)} · ${esc(`${CONTATO.endereco.logradouro}, ${CONTATO.endereco.bairro} — ${CONTATO.endereco.cidade}/${CONTATO.endereco.uf}`)}</span>`)}`;
+}
+
+const FALE_COM_A_GENTE_TEXTO = `FALE COM A GENTE
+WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}
+${CONTATO.horario}`;
+
 function boasVindas(cadastro: CadastroParaEmail, ctx: ContextoCadastro) {
   const site = urlDosLinks();
   const nome = cadastro.nomeFantasia || cadastro.nome;
@@ -671,8 +698,7 @@ ${paragrafo(abertura)}
 ${botao(`${site}/produtos`, ctx.liberado ? "Ver o catálogo com preços" : "Ver o catálogo")}
 ${h2("Como funciona")}
 ${passos(itens)}
-${h2("Fale com a gente")}
-${paragrafo(`WhatsApp <strong>${esc(CONTATO.whatsapp)}</strong> · ${link(`mailto:${CONTATO.email}`, CONTATO.email)}<br><span style="color:${COR.suave};">${esc(CONTATO.horario)} · ${esc(`${CONTATO.endereco.logradouro}, ${CONTATO.endereco.bairro} — ${CONTATO.endereco.cidade}/${CONTATO.endereco.uf}`)}</span>`)}`,
+${faleComAGenteHtml()}`,
   });
 
   const texto = `Olá, ${nome}!
@@ -689,9 +715,7 @@ COMO FUNCIONA
 
 ${passosTexto(itens)}
 
-FALE COM A GENTE
-WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}
-${CONTATO.horario}
+${FALE_COM_A_GENTE_TEXTO}
 
 ${RODAPE_TEXTO}`;
 
@@ -705,16 +729,34 @@ ${RODAPE_TEXTO}`;
 }
 
 function avisoParaCasa(cadastro: CadastroParaEmail, ctx: ContextoCadastro) {
-  const nome = cadastro.nomeFantasia || cadastro.nome;
+  const antiga = ctx.fichaExistente;
+  const nome = antiga ? antiga.nomeDaFicha : cadastro.nomeFantasia || cadastro.nome;
   const ficha = `${urlDosLinks()}/admin/clientes/${cadastro.id}`;
-  const origem = ctx.fichaExistente
-    ? "Cliente que já tinha ficha criou o login pelo site (o e-mail digitado é o mesmo da ficha)."
+
+  const origem = antiga
+    ? `Alguém pediu pelo site o login de uma ficha que já existia, com um dos e-mails dela (${cadastro.email}).`
     : "Cliente novo, cadastrado pelo site.";
-  const situacao = ctx.liberado
-    ? `${ctx.fichaExistente ? "Já entrou" : "Cadastrado e liberado automaticamente: já entrou"} e vê os preços. Para suspender, mude a situação ou o "pode ver preços" na ficha.`
-    : "O login já existe, mas os preços só aparecem quando você mudar a situação para Ativo na ficha (a liberação automática está desligada em Configurações).";
-  const titulo = ctx.fichaExistente
-    ? `Cliente com ficha criou o login pelo site${ctx.liberado ? "" : " (aguardando liberação)"}: ${nome}`
+  const situacao = antiga
+    ? `Por segurança, a pessoa só entra depois de abrir o link que mandamos para ${cadastro.email} e criar a senha. ${
+        ctx.liberado
+          ? "Quando entrar, já vê os preços."
+          : "Mesmo depois disso, os preços só aparecem quando você mudar a situação para Ativo na ficha (a liberação automática está desligada em Configurações)."
+      }`
+    : ctx.liberado
+      ? 'Cadastrado e liberado automaticamente: já entrou e vê os preços. Para suspender, mude a situação ou o "pode ver preços" na ficha.'
+      : "O login já existe, mas os preços só aparecem quando você mudar a situação para Ativo na ficha (a liberação automática está desligada em Configurações).";
+  // O que de fato mudou na ficha antiga — o resto do que foi digitado NÃO
+  // foi gravado (a ficha da equipe vale mais que o formulário).
+  const mudou = antiga
+    ? [
+        "ganhou o login",
+        antiga.passouParaAtivo ? "passou de Incompleto para Ativo" : null,
+      ]
+        .filter(Boolean)
+        .join("; ")
+    : "";
+  const titulo = antiga
+    ? `Ficha antiga pediu o login pelo site${ctx.liberado ? "" : " (aguardando liberação)"}: ${nome}`
     : ctx.liberado
       ? `Novo cliente cadastrado e liberado: ${nome}`
       : `Novo cadastro aguardando liberação: ${nome}`;
@@ -730,12 +772,13 @@ function avisoParaCasa(cadastro: CadastroParaEmail, ctx: ContextoCadastro) {
 
   const html = moldura({
     titulo,
-    previa: `${origem} ${ctx.liberado ? "Já vê os preços." : "Aguarda liberação."}`,
+    previa: `${origem} ${antiga ? "Entra depois de confirmar o e-mail." : ctx.liberado ? "Já vê os preços." : "Aguarda liberação."}`,
     conteudo: `${h1(titulo)}
 ${paragrafo(esc(origem))}
 ${caixa(esc(situacao))}
+${antiga ? paragrafo(`<strong>Na ficha:</strong> ${esc(mudou)}.`) : ""}
 ${botao(ficha, "Abrir a ficha no painel")}
-${h2(ctx.fichaExistente ? "Dados digitados no site" : "Dados do cadastro", ctx.fichaExistente ? "a ficha não foi alterada, só ganhou o login" : undefined)}
+${h2(antiga ? "Dados digitados no site" : "Dados do cadastro", antiga ? "não foram gravados na ficha" : undefined)}
 ${tabelaDados(dados)}
 ${paragrafo(`<span style="display:block;margin-top:14px;font-size:13px;color:${COR.suave};">Responder este e-mail fala direto com o cliente.</span>`)}`,
   });
@@ -744,7 +787,7 @@ ${paragrafo(`<span style="display:block;margin-top:14px;font-size:13px;color:${C
 
 ${origem}
 ${situacao}
-${ctx.fichaExistente ? "\nDados digitados no site (a ficha não foi alterada, só ganhou o login):" : ""}
+${antiga ? `\nNa ficha: ${mudou}.\n\nDados digitados no site (não foram gravados na ficha):` : ""}
 ${dados
   .filter(([, v]) => v)
   .map(([r, v]) => `${r}: ${v}`)
@@ -754,8 +797,8 @@ Ficha no painel:
 ${ficha}`;
 
   return {
-    assunto: ctx.fichaExistente
-      ? `Login criado pelo site${ctx.liberado ? "" : ", para liberar"} (cliente com ficha) — ${nome}`
+    assunto: antiga
+      ? `Ficha antiga pediu login pelo site${ctx.liberado ? "" : ", para liberar"} — ${nome}`
       : ctx.liberado
         ? `Novo cliente cadastrado e liberado — ${nome}`
         : `Novo cadastro para liberar — ${nome}`,
@@ -765,7 +808,35 @@ ${ficha}`;
 }
 
 /**
- * Cadastro pelo site: boas-vindas ao lojista + aviso à casa.
+ * Aviso de cadastro para a casa (Configurações → e-mails de notificação).
+ * Responder cai direto no lojista. Falha é logada e engolida.
+ */
+export async function avisarCasaDoCadastro(cadastro: CadastroParaEmail, ctx: ContextoCadastro) {
+  const t = transporte();
+  if (!t) {
+    console.warn(`[email] SMTP não configurado — aviso do cadastro ${cadastro.id} não enviado.`);
+    return;
+  }
+  const casa = avisoParaCasa(cadastro, ctx);
+  const resultados = await Promise.allSettled(
+    (await emailsDaCasa()).map((para) =>
+      t.sendMail({
+        from: remetente(),
+        to: para,
+        replyTo: cadastro.email,
+        subject: casa.assunto,
+        text: casa.texto,
+        html: casa.html,
+      }),
+    ),
+  );
+  for (const r of resultados) {
+    if (r.status === "rejected") console.error(`[email] falha no aviso do cadastro ${cadastro.id}:`, r.reason);
+  }
+}
+
+/**
+ * Cadastro NOVO pelo site: boas-vindas ao lojista + aviso à casa.
  * Falha de e-mail NÃO desfaz o cadastro — ele já está no painel e o lojista
  * já entrou.
  */
@@ -780,9 +851,7 @@ export async function enviarEmailsDeCadastro(
   }
 
   const lojista = boasVindas(cadastro, ctx);
-  const casa = avisoParaCasa(cadastro, ctx);
-
-  const envios = [
+  const [boas] = await Promise.allSettled([
     t.sendMail({
       from: remetente(),
       to: cadastro.email,
@@ -790,22 +859,9 @@ export async function enviarEmailsDeCadastro(
       text: lojista.texto,
       html: lojista.html,
     }),
-    ...(await emailsDaCasa()).map((para) =>
-      t.sendMail({
-        from: remetente(),
-        to: para,
-        // Responder o aviso cai direto no lojista.
-        replyTo: cadastro.email,
-        subject: casa.assunto,
-        text: casa.texto,
-        html: casa.html,
-      }),
-    ),
-  ];
-  const resultados = await Promise.allSettled(envios);
-  for (const r of resultados) {
-    if (r.status === "rejected") console.error(`[email] falha no cadastro ${cadastro.id}:`, r.reason);
-  }
+    avisarCasaDoCadastro(cadastro, ctx),
+  ]);
+  if (boas.status === "rejected") console.error(`[email] falha nas boas-vindas do cadastro ${cadastro.id}:`, boas.reason);
 }
 
 /**

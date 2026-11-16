@@ -23,6 +23,46 @@ export function FormularioCadastro({
     { ok: false },
   );
   const [tipoPessoa, setTipoPessoa] = useState<"juridica" | "fisica">("juridica");
+  // Ficha antiga: deu certo, mas a entrada espera o lojista abrir o link no
+  // e-mail da ficha (ver vincularFichaAntiga em acoes.ts).
+  if (estado.ok && estado.linkEnviadoPara) {
+    return (
+      <div
+        data-link-enviado
+        className="rounded-2xl border border-borda/60 bg-superficie p-8 text-center shadow-suave"
+      >
+        <h2 className="text-xl font-bold tracking-tight text-texto">Confira o seu e-mail</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-suave">
+          Encontramos o cadastro da sua loja. Enviamos para{" "}
+          <strong className="break-all font-semibold text-texto">{estado.linkEnviadoPara}</strong>{" "}
+          um link para você criar a senha e entrar.
+        </p>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-suave">
+          Para proteger os dados da loja, a senha que você digitou aqui não
+          foi guardada: crie a sua pelo link (pode ser a mesma).
+          {estado.liberado
+            ? " Assim que criar, você entra já vendo os preços."
+            : " Os preços aparecem quando a nossa equipe liberar a sua loja."}
+        </p>
+        <p className="mx-auto mt-3 max-w-md text-xs leading-relaxed text-suave">
+          Não chegou? Olhe a caixa de spam ou peça outro link em{" "}
+          <Link href="/esqueci-senha" className="font-semibold text-acento-texto">
+            Esqueci minha senha
+          </Link>
+          . Esse e-mail não é mais seu?{" "}
+          <a
+            href={linkWhatsApp("Olá! Tentei fazer o cadastro pelo site e o meu documento já tem ficha na Galé, mas não tenho mais acesso ao e-mail dela.")}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-acento-texto"
+          >
+            Fale com a equipe no WhatsApp
+          </a>
+          .
+        </p>
+      </div>
+    );
+  }
 
   // Só chega aqui o "ok" do honeypot (robô) — o cadastro de verdade termina
   // com redirect para /cadastro/bem-vindo, já logado.

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function PaginaCadastro() {
-  const [config, automatico, { user }] = await Promise.all([
+  const [config, { ligada: automatico }, { user }] = await Promise.all([
     configPublica(),
     aprovacaoAutomatica(),
     sessaoCatalogo(),
