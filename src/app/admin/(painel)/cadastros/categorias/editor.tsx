@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import {
   Aviso,
   BotaoCancelar,
@@ -10,6 +10,7 @@ import {
   EtiquetaAtivo,
   Interruptor,
   Modal,
+  useEnvio,
 } from "@/components/cadastro-ui";
 import {
   alternarCategoria,
@@ -35,10 +36,9 @@ function Formulario({
   categoria: Categoria | "nova";
   aoFechar: () => void;
 }) {
-  const [estado, acao] = useActionState<EstadoCategoria, FormData>(
-    salvarCategoria,
-    {},
-  );
+  // onSubmit em vez de `<form action>`: com erro (nome repetido, por exemplo),
+  // o reset do React 19 apagava o que tinha sido digitado. Ver useEnvio.
+  const [estado, aoEnviar, salvando] = useEnvio<EstadoCategoria>(salvarCategoria, {});
   const editando = categoria !== "nova";
 
   return (
@@ -47,7 +47,7 @@ function Formulario({
       aoFechar={aoFechar}
       fecharQuando={!!estado.ok}
     >
-      <form action={acao} className="flex flex-col gap-4">
+      <form onSubmit={aoEnviar} className="flex flex-col gap-4">
         {editando && <input type="hidden" name="id" value={categoria.id} />}
 
         <label className="flex flex-col gap-1.5">
@@ -95,7 +95,7 @@ function Formulario({
 
         <div className="mt-1 flex items-center justify-end gap-2">
           <BotaoCancelar aoClicar={aoFechar} />
-          <BotaoSalvar />
+          <BotaoSalvar salvando={salvando} />
         </div>
       </form>
     </Modal>
