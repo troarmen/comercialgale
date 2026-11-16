@@ -93,6 +93,12 @@ async function apagarArquivos(caminhos: (string | null | undefined)[]) {
  * Confere e sobe um arquivo. Devolve a imagem guardada, ou o erro em texto.
  * O tipo e o tamanho vêm dos BYTES do arquivo (dimensoes.ts), não do que o
  * navegador declarou.
+ *
+ * Sobe os BYTES, não o File: com um File/Blob o storage-js manda multipart e
+ * IGNORA a opção `contentType` — o bucket público guardaria e serviria o
+ * `type` que o navegador declarou (um pedido montado à mão poderia pôr
+ * image/svg+xml). Com o ArrayBuffer, o Content-Type é o que lemos no
+ * cabeçalho da imagem.
  */
 async function subir(
   arquivo: File,
@@ -111,7 +117,7 @@ async function subir(
   const caminho = nomeArquivo(prefixo, info.extensao);
   const { error } = await criarClienteAdmin()
     .storage.from(BUCKET)
-    .upload(caminho, arquivo, {
+    .upload(caminho, await arquivo.arrayBuffer(), {
       contentType: info.tipo,
       upsert: false,
       // Nome único por envio = conteúdo imutável: pode ficar um ano em cache.
