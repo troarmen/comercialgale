@@ -20,6 +20,7 @@ import { CONTATO } from "@/lib/contato";
 import { numero, reais, urlFoto } from "@/lib/formato";
 import { linkWhatsApp } from "@/lib/seo";
 import { bannersDaLoja } from "@/lib/vitrine";
+import { aprovacaoAutomatica } from "./cadastro/servidor";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -32,30 +33,41 @@ export const metadata: Metadata = {
  * a vitrine começa a vender antes do scroll.
  */
 
-const PASSOS = [
-  {
-    titulo: "Faça o seu cadastro",
-    texto: "Conte quem é a sua loja. Leva menos de dois minutos.",
-  },
-  {
-    titulo: "Aguarde a liberação",
-    texto: "Nossa equipe confere e libera o seu acesso de lojista.",
-  },
-  {
-    titulo: "Veja os preços e monte o pedido",
-    texto: "Atacado e Varejo lado a lado, por embalagem fechada.",
-  },
-  {
-    titulo: "Combine pagamento e envio",
-    texto: "Recebemos o pedido e entramos em contato para fechar do seu jeito.",
-  },
-];
+/*
+ * O passo 2 depende do interruptor "Liberar cadastro automaticamente" do
+ * painel (out/nov 2026): ligado, o lojista vê os preços assim que se cadastra.
+ */
+function passos(automatico: boolean) {
+  return [
+    {
+      titulo: "Faça o seu cadastro",
+      texto: "Conte quem é a sua loja e crie a sua senha. Leva menos de dois minutos.",
+    },
+    automatico
+      ? {
+          titulo: "Entre e veja os preços",
+          texto: "O acesso é liberado na hora: Atacado e Varejo em todo o catálogo.",
+        }
+      : {
+          titulo: "Aguarde a liberação",
+          texto: "Nossa equipe confere e libera o seu acesso de lojista.",
+        },
+    {
+      titulo: "Monte o pedido",
+      texto: "Atacado e Varejo lado a lado, por embalagem fechada.",
+    },
+    {
+      titulo: "Combine pagamento e envio",
+      texto: "Recebemos o pedido e entramos em contato para fechar do seu jeito.",
+    },
+  ];
+}
 
 export default async function PaginaInicial() {
   // Banners do painel (Vitrine). Sai junto com as consultas abaixo; com um ou
   // mais ativos, o topo vira carrossel no lugar do banner padrão.
   const promessaBanners = bannersDaLoja();
-  const [categorias, lancamentos, marcas, config, totalProdutos, { cliente }] =
+  const [categorias, lancamentos, marcas, config, totalProdutos, { cliente }, liberacao] =
     await Promise.all([
       arvoreCategorias(),
       listarProdutos({ lancamentos: true, porPagina: 8, ordem: "recentes" }),
@@ -63,6 +75,7 @@ export default async function PaginaInicial() {
       configPublica(),
       contarProdutosAtivos(),
       sessaoCatalogo(),
+      aprovacaoAutomatica(),
     ]);
 
   /*
@@ -418,9 +431,11 @@ export default async function PaginaInicial() {
             Como comprar no atacado da Galé
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-suave">
-            O catálogo é aberto para todo mundo. Os preços aparecem depois que a
-            sua loja é aprovada — sem cartão no site: o pagamento é combinado
-            diretamente com a nossa equipe.
+            O catálogo é aberto para todo mundo. Os preços aparecem para
+            lojistas cadastrados
+            {liberacao.ligada ? " — o acesso é liberado assim que você se cadastra" : " depois que a sua loja é aprovada"}
+            . Sem cartão no site: o pagamento é combinado diretamente com a nossa
+            equipe.
             {config.pedidoMinimo > 0 &&
               ` Compras no atacado são a partir de ${reais(config.pedidoMinimo)}.`}
           </p>
@@ -432,7 +447,7 @@ export default async function PaginaInicial() {
               className="absolute left-[10%] right-[10%] top-9 hidden border-t-2 border-dashed border-borda-forte lg:block"
             />
             <ol className="relative grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {PASSOS.map((passo, i) => (
+              {passos(liberacao.ligada).map((passo, i) => (
                 <li
                   key={i}
                   className="rounded-2xl border border-borda/60 bg-fundo p-5 shadow-pousada transition duration-200 hover:-translate-y-0.5 hover:shadow-suave"

@@ -83,8 +83,8 @@ export function ComprarProduto({
             Preço de Atacado e de Varejo para clientes cadastrados
           </p>
           <p className="mt-1.5 text-sm leading-relaxed text-suave">
-            Cadastre a sua loja gratuitamente. Assim que o acesso for liberado,
-            você vê os dois preços de todo o catálogo e monta o pedido online.
+            Cadastre a sua loja gratuitamente para ver os dois preços de todo
+            o catálogo e montar o pedido online.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Link

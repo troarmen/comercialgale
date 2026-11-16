@@ -96,8 +96,12 @@ export function FormularioEntrar({ destino }: { destino: string }) {
         </Link>
       </p>
       <p className="text-center text-xs leading-relaxed text-suave">
-        Ainda não tem login? Fale com a nossa equipe pelo WhatsApp que a gente
-        resolve.
+        Ainda não tem login?{" "}
+        <Link href="/cadastro" className="font-semibold text-acento-texto hover:text-acento-forte">
+          Cadastre a sua loja
+        </Link>
+        . Já comprava com a Galé? Use “Esqueci minha senha” com o e-mail do seu
+        cadastro.
       </p>
     </form>
   );
