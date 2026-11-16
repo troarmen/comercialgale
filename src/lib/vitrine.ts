@@ -95,19 +95,27 @@ export const LOGO_PADRAO: LogoLoja = {
 // esconderijo clássico de `java\tscript:`.
 const INVISIVEL = /[\s\u0000-\u001f\u007f]/;
 
+// `//outro.com` e `/\outro.com`: o navegador lê como OUTRO site.
+const OUTRO_SITE = /^\/[\\/]/;
+
 /**
  * Página do próprio site: começa com UMA barra. `//outro.com` e `/\outro.com`
- * são lidos pelo navegador como OUTRO site, então ficam de fora. Devolve o
- * caminho normalizado (sem `..`), ou null se não for um caminho válido.
+ * ficam de fora. Devolve o caminho normalizado (sem `.` e `..`), ou null se
+ * não for um caminho válido.
+ *
+ * A barra dupla é conferida DE NOVO no resultado: a normalização some com os
+ * pontos, e `/.//outro.com` ou `/%2e%2e//outro.com` saem dela como
+ * `//outro.com`.
  */
 export function normalizarCaminho(texto: string): string | null {
   const t = texto.trim();
-  if (!t.startsWith("/") || /^\/[\\/]/.test(t) || INVISIVEL.test(t)) return null;
+  if (!t.startsWith("/") || OUTRO_SITE.test(t) || INVISIVEL.test(t)) return null;
   try {
     const base = "https://loja.invalid";
     const u = new URL(t, base);
     if (u.origin !== base) return null;
-    return `${u.pathname}${u.search}${u.hash}`;
+    const saida = `${u.pathname}${u.search}${u.hash}`;
+    return OUTRO_SITE.test(saida) ? null : saida;
   } catch {
     return null;
   }
