@@ -5,16 +5,27 @@ import { Aviso } from "@/components/cadastro-ui";
 import { ResultadoConvite } from "@/components/resultado-convite";
 import { criarAcesso, reenviarSenha, revogarAcesso } from "./acoes";
 
+/**
+ * Login do cliente no catálogo.
+ *
+ * Desde nov/2026 quem se cadastra pelo SITE já nasce com login e senha
+ * escolhida por ele (cadastro/acoes.ts) — o botão "Criar login e enviar
+ * convite" ficou para os clientes cadastrados pela equipe e para os antigos
+ * que ainda não têm login.
+ */
 export function GerenciarAcesso({
   clienteId,
   temLogin,
   email,
   podeVerPrecos,
+  status,
 }: {
   clienteId: number;
   temLogin: boolean;
   email: string | null;
   podeVerPrecos: boolean;
+  /** situação da ficha — opcional para não quebrar quem ainda não passa */
+  status?: "ativo" | "inativo" | "incompleto";
 }) {
   const [pendente, iniciar] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -41,11 +52,16 @@ export function GerenciarAcesso({
     return (
       <div className="rounded-xl border border-borda bg-superficie p-4">
         <h2 className="text-sm font-semibold text-texto">Acesso ao catálogo</h2>
-        <p className="mt-1 mb-3 text-sm leading-relaxed text-suave">
+        <p className="mt-1 text-sm leading-relaxed text-suave">
           Este cliente ainda não tem login, então navega no catálogo{" "}
           <strong className="font-medium text-texto">sem ver preço</strong>.
           Criar o login libera os valores: ele recebe por e-mail o link para
           criar a própria senha.
+        </p>
+        <p className="mt-2 mb-3 text-xs leading-relaxed text-suave">
+          Cadastros feitos pelo site já chegam com login — o próprio lojista
+          cria a senha ao se cadastrar. Use este botão só para clientes
+          cadastrados pela equipe ou antigos que ainda não têm login.
         </p>
 
         <label className="flex flex-col gap-1.5">
@@ -96,7 +112,13 @@ export function GerenciarAcesso({
         Entra com <span className="break-all text-texto">{email}</span>
       </p>
       <p className="mt-2 text-sm text-suave">
-        {podeVerPrecos ? (
+        {status && status !== "ativo" ? (
+          <span className="text-alerta-texto">
+            {status === "incompleto"
+              ? "Login criado, aguardando liberação: o cliente só vê preço quando a situação mudar para Ativo (ele recebe um e-mail avisando)."
+              : "Login existe, mas a ficha está Inativa: o cliente não vê preço."}
+          </span>
+        ) : podeVerPrecos ? (
           <span className="text-ok-texto">Enxerga os preços normalmente.</span>
         ) : (
           <span className="text-alerta-texto">

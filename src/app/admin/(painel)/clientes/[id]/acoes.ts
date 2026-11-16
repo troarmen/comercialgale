@@ -1,9 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { enviarAvisoDeLiberacao } from "@/lib/email";
 import { convidarComLink, linkSenhaLiberado } from "@/lib/links-senha";
 import { exigirAdmin } from "@/lib/sessao";
 import { criarClienteAdmin } from "@/lib/supabase/server";
+import { normalizarDocumento } from "@/lib/validacao";
 
 export type Resultado = {
   ok?: boolean;
@@ -37,12 +40,16 @@ export async function salvarCliente(
   const texto = (campo: string) =>
     String(form.get(campo) ?? "").trim() || null;
 
+  const tipoPessoa =
+    form.get("tipo_pessoa") === "juridica" ? ("juridica" as const) : ("fisica" as const);
+
   const campos = {
     nome,
     nome_fantasia: texto("nome_fantasia"),
-    tipo_pessoa: form.get("tipo_pessoa") === "juridica" ? "juridica" as const : "fisica" as const,
+    tipo_pessoa: tipoPessoa,
     status: String(form.get("status") ?? "ativo") as "ativo" | "inativo" | "incompleto",
-    documento: (texto("documento") ?? "").replace(/\D/g, "") || null,
+    // CNPJ alfanumérico (2026) mantém as letras — ver src/lib/validacao.ts.
+    documento: normalizarDocumento(tipoPessoa, texto("documento") ?? "") || null,
     inscricao_estadual: texto("inscricao_estadual"),
     rg: texto("rg"),
     email: email || null,
@@ -60,12 +67,35 @@ export async function salvarCliente(
     pode_ver_precos: form.get("pode_ver_precos") === "on",
   };
 
+  // Situação ANTES de salvar: se o lojista se cadastrou com a liberação
+  // automática desligada, ele já tem login e senha e espera a equipe ativar.
+  // A passagem para Ativo é o momento de avisá-lo.
+  const { data: antes } = await sessao.supabase
+    .from("clientes")
+    .select("status, user_id")
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await sessao.supabase
     .from("clientes")
     .update(campos)
     .eq("id", id);
 
   if (error) return { erro: error.message };
+
+  if (
+    antes?.status === "incompleto" &&
+    antes.user_id &&
+    campos.status === "ativo" &&
+    campos.pode_ver_precos &&
+    campos.email
+  ) {
+    const para = campos.email;
+    const quem = campos.nome_fantasia || nome;
+    // Depois da resposta: o Arthur não espera o SMTP, e falha de e-mail não
+    // desfaz a liberação.
+    after(() => enviarAvisoDeLiberacao(para, quem));
+  }
 
   await sessao.supabase.from("log_atividades").insert({
     user_id: sessao.user.id,
