@@ -84,7 +84,20 @@ export function GaleriaProduto({ fotos, titulo }: { fotos: Foto[]; titulo: strin
                 i === indice ? "border-gale-500" : "border-borda hover:border-borda-forte"
               }`}
             >
-              <Image src={f.url} alt="" fill sizes="64px" className="object-contain p-1" />
+              {/* a miniatura da foto ativa usa a MESMA URL da foto grande (fotos
+                  sem otimizador) e o next/image em dev guarda uma entrada por
+                  URL: a miniatura "lazy", registrada depois, apagava a marca de
+                  prioridade da foto grande e o console acusava falso aviso de
+                  LCP. "eager" aqui não custa download nenhum — é o mesmo
+                  arquivo que a foto grande já está baixando. */}
+              <Image
+                src={f.url}
+                alt=""
+                fill
+                sizes="64px"
+                loading={i === indice ? "eager" : undefined}
+                className="object-contain p-1"
+              />
             </button>
           ))}
         </div>
