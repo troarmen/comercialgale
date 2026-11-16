@@ -45,6 +45,23 @@ export async function salvarProduto(
   if (titulo.length < 2) return { erro: "O nome do produto é obrigatório." };
   if (!modelo) return { erro: "A referência é obrigatória." };
 
+  // Cadastro aberto pelo "Duplicar": a referência precisa ser outra. O banco
+  // não exige referência única (há refs repetidas entre marcas), então a
+  // conferência é contra o produto de origem — lido do banco, não do form.
+  const duplicadoDe = id ? 0 : Number(form.get("duplicado_de") ?? 0);
+  if (duplicadoDe > 0) {
+    const { data: origem } = await supabase
+      .from("produtos")
+      .select("modelo")
+      .eq("id", duplicadoDe)
+      .maybeSingle();
+    if (origem && origem.modelo.trim().toLowerCase() === modelo.toLowerCase()) {
+      return {
+        erro: `A referência ${modelo} é a do produto que foi duplicado. Informe a referência do produto novo.`,
+      };
+    }
+  }
+
   const categoriaId = Number(form.get("categoria_id") ?? 0);
   const kitId = Number(form.get("kit_id") ?? 0);
   if (!categoriaId) return { erro: "Escolha a categoria." };
@@ -76,7 +93,9 @@ export async function salvarProduto(
     titulo,
     modelo,
     slug,
-    descricao: String(form.get("descricao") ?? "").trim() || null,
+    // O envio do formulário troca \n por \r\n; o banco guarda só \n, como
+    // veio da migração. O negrito vai junto, como **trecho** (lib/descricao).
+    descricao: String(form.get("descricao") ?? "").replace(/\r\n?/g, "\n").trim() || null,
     tags,
     categoria_id: categoriaId,
     subcategoria_id: subcategoriaId,

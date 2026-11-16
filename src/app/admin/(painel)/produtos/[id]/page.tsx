@@ -1,30 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BotaoVoltar } from "@/components/voltar";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { carregarProduto } from "./dados";
 import { ExcluirProduto } from "./excluir";
 import { FormularioProduto } from "./formulario";
 import { Fotos } from "./fotos";
 
 export const metadata: Metadata = { title: "Produto · Galé Comercial" };
-
-export async function carregarListas() {
-  const supabase = await criarClienteServidor();
-  const [cat, sub, fab, kits, tam] = await Promise.all([
-    supabase.from("categorias").select("id, nome").eq("ativo", true).order("ordem").order("nome"),
-    supabase.from("subcategorias").select("id, nome, categoria_id").eq("ativo", true).order("nome"),
-    supabase.from("fabricantes").select("id, nome").eq("ativo", true).order("nome"),
-    supabase.from("kits").select("id, pecas").eq("ativo", true).order("pecas"),
-    supabase.from("tamanhos").select("id, valor, tipo").eq("ativo", true).order("ordem").order("valor"),
-  ]);
-  return {
-    categorias: cat.data ?? [],
-    subcategorias: sub.data ?? [],
-    fabricantes: fab.data ?? [],
-    kits: kits.data ?? [],
-    tamanhos: tam.data ?? [],
-  };
-}
 
 export default async function PaginaProduto({
   params,
@@ -32,105 +16,70 @@ export default async function PaginaProduto({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const dados = await carregarProduto(Number(id));
+  if (!dados) notFound();
+  const { p, grade, listas, legadoId } = dados;
+
   const supabase = await criarClienteServidor();
-
-  const [{ data: produto }, listas] = await Promise.all([
+  const [{ data: fotos }, { count: emPedidos }] = await Promise.all([
     supabase
-      .from("produtos")
-      .select(
-        `id, titulo, modelo, descricao, tags, categoria_id, subcategoria_id,
-         fabricante_id, kit_id, ncm, possui_st, ativo, lancamento, legado_id`,
-      )
-      .eq("id", Number(id))
-      .maybeSingle(),
-    carregarListas(),
+      .from("produto_imagens")
+      .select("id, storage_path, principal, ordem")
+      .eq("produto_id", p.id)
+      .order("ordem"),
+    supabase
+      .from("pedido_itens")
+      .select("id", { count: "exact", head: true })
+      .eq("produto_id", p.id),
   ]);
-
-  if (!produto) notFound();
-
-  // Preço vem pela view: as colunas de preço da tabela são bloqueadas por
-  // privilégio de coluna (a trava que impede visitante de ver valor).
-  const { data: precos } = await supabase
-    .from("precos_visiveis")
-    .select(
-      "produto_tamanho_id, preco_base_atacado, preco_base_varejo, preco_proprio_atacado, preco_proprio_varejo",
-    )
-    .eq("produto_id", produto.id);
-
-  const [{ data: variacoes }, { data: fotos }, { count: emPedidos }] =
-    await Promise.all([
-      // Sem as colunas de preço: elas são bloqueadas por privilégio de
-      // coluna. Os valores vêm da view `precos_visiveis`, logo acima.
-      supabase
-        .from("produto_tamanhos")
-        .select("id, tamanho_id, ordem")
-        .eq("produto_id", produto.id)
-        .order("ordem"),
-      supabase
-        .from("produto_imagens")
-        .select("id, storage_path, principal, ordem")
-        .eq("produto_id", produto.id)
-        .order("ordem"),
-      supabase
-        .from("pedido_itens")
-        .select("id", { count: "exact", head: true })
-        .eq("produto_id", produto.id),
-    ]);
-
-  // O preço do produto é igual em todas as linhas da view; basta a primeira.
-  const base = precos?.[0];
-  // Preço próprio de cada tamanho, indexado pelo id da variação.
-  const proprio = new Map(
-    (precos ?? []).map((x) => [
-      x.produto_tamanho_id,
-      {
-        atacado: x.preco_proprio_atacado == null ? null : Number(x.preco_proprio_atacado),
-        varejo: x.preco_proprio_varejo == null ? null : Number(x.preco_proprio_varejo),
-      },
-    ]),
-  );
 
   return (
     <div className="px-8 py-7">
-      <nav className="mb-3 text-sm text-suave">
-        <Link href="/admin/produtos" className="transition hover:text-texto">
-          Produtos
-        </Link>
-        <span className="px-1.5 text-tenue">/</span>
-        <span className="text-texto">{produto.titulo}</span>
-      </nav>
+      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+        {/* Volta para a lista como ela estava: mesma busca, página e rolagem. */}
+        <BotaoVoltar chave="produtos" padrao="/admin/produtos" rotulo="Voltar para produtos" />
+        <nav className="text-sm text-suave">
+          <Link href="/admin/produtos" className="transition hover:text-texto">
+            Produtos
+          </Link>
+          <span className="px-1.5 text-tenue">/</span>
+          <span className="text-texto">{p.titulo}</span>
+        </nav>
+      </div>
 
       <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-texto">
-            {produto.titulo}
+            {p.titulo}
           </h1>
           <p className="mt-1 text-sm text-suave">
-            ref. {produto.modelo}
-            {produto.legado_id && ` · vindo do sistema antigo`}
+            ref. {p.modelo}
+            {legadoId && ` · vindo do sistema antigo`}
             {emPedidos ? ` · em ${emPedidos} pedidos` : ""}
           </p>
         </div>
-        <ExcluirProduto id={produto.id} emPedidos={emPedidos ?? 0} />
+        <div className="flex items-start gap-2">
+          {/* Cadastro de produto parecido: abre o formulário novo já preenchido. */}
+          <Link
+            href={`/admin/produtos/novo?de=${p.id}`}
+            title="Abrir um cadastro novo com todos os campos deste produto"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-borda bg-superficie px-3.5 text-sm font-medium text-texto transition hover:bg-superficie-2"
+          >
+            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+              <rect x="6.5" y="6.5" width="9" height="9" rx="1.8" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M13.5 4.5v-.2a1.8 1.8 0 0 0-1.8-1.8H6.3a1.8 1.8 0 0 0-1.8 1.8v5.4a1.8 1.8 0 0 0 1.8 1.8h.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            Duplicar
+          </Link>
+          <ExcluirProduto id={p.id} emPedidos={emPedidos ?? 0} />
+        </div>
       </header>
 
       <div className="max-w-4xl space-y-4">
-        <Fotos produtoId={produto.id} fotos={fotos ?? []} />
+        <Fotos produtoId={p.id} fotos={fotos ?? []} />
 
-        <FormularioProduto
-          p={{
-            ...produto,
-            tags: produto.tags ?? [],
-            preco_atacado: Number(base?.preco_base_atacado ?? 0),
-            preco_varejo: Number(base?.preco_base_varejo ?? 0),
-          }}
-          listas={listas}
-          grade={(variacoes ?? []).map((v) => ({
-            tamanho_id: v.tamanho_id,
-            preco_atacado: proprio.get(v.id)?.atacado ?? null,
-            preco_varejo: proprio.get(v.id)?.varejo ?? null,
-          }))}
-        />
+        {/* key: trocar de produto sem recarregar não pode herdar o estado do anterior */}
+        <FormularioProduto key={p.id} p={p} listas={listas} grade={grade} />
       </div>
     </div>
   );

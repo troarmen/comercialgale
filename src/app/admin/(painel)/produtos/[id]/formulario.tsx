@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { Aviso, BotaoSalvar, CAMPO, Interruptor } from "@/components/cadastro-ui";
+import { useState } from "react";
+import { Aviso, BotaoSalvar, CAMPO, Interruptor, useEnvio } from "@/components/cadastro-ui";
 import { reais } from "@/lib/formato";
 import { salvarProduto, type EstadoProduto } from "./acoes";
+import { EditorDescricao } from "./descricao";
 import { Grade, type LinhaGrade, type OpcaoTamanho } from "./grade";
 
 export type DadosProduto = {
@@ -24,13 +25,22 @@ export type DadosProduto = {
   lancamento: boolean;
 };
 
+/**
+ * Opções dos <select>. Vêm só os itens ativos MAIS os que este produto já
+ * usa (ver `carregarListas`), e por isso cada um traz o próprio `ativo`.
+ */
 export type Listas = {
-  categorias: { id: number; nome: string }[];
-  subcategorias: { id: number; nome: string; categoria_id: number }[];
-  fabricantes: { id: number; nome: string }[];
-  kits: { id: number; pecas: number }[];
+  categorias: { id: number; nome: string; ativo: boolean }[];
+  subcategorias: { id: number; nome: string; categoria_id: number; ativo: boolean }[];
+  fabricantes: { id: number; nome: string; ativo: boolean }[];
+  kits: { id: number; pecas: number; ativo: boolean }[];
   tamanhos: OpcaoTamanho[];
 };
+
+/** "Linha Praia (inativa)" — o item aparece, mas avisando. */
+function rotuloOpcao(nome: string, ativo: boolean, genero: "a" | "o" = "a") {
+  return ativo ? nome : `${nome} (inativ${genero})`;
+}
 
 function Secao({
   titulo,
@@ -59,16 +69,18 @@ export function FormularioProduto({
   listas,
   grade,
   rotulo = "Salvar produto",
+  duplicadoDe,
 }: {
   p: DadosProduto;
   listas: Listas;
   grade: LinhaGrade[];
   rotulo?: string;
+  /** Cadastro aberto pelo "Duplicar": de qual produto vieram os campos. */
+  duplicadoDe?: { id: number; modelo: string };
 }) {
-  const [estado, acao] = useActionState<EstadoProduto, FormData>(
-    salvarProduto,
-    {},
-  );
+  // Sem `<form action>`: o reset automático do React 19 voltava Categoria e
+  // Kit para "Escolha…" depois de salvar (ver useEnvio).
+  const [estado, aoEnviar, salvando] = useEnvio<EstadoProduto>(salvarProduto, {});
 
   const [categoria, setCategoria] = useState(p.categoria_id ?? 0);
   const [kitId, setKitId] = useState(p.kit_id ?? 0);
@@ -96,8 +108,11 @@ export function FormularioProduto({
   );
 
   return (
-    <form action={acao} className="space-y-4">
+    <form onSubmit={aoEnviar} className="space-y-4">
       {p.id > 0 && <input type="hidden" name="id" value={p.id} />}
+      {duplicadoDe && (
+        <input type="hidden" name="duplicado_de" value={duplicadoDe.id} />
+      )}
 
       <Secao titulo="Identificação">
         <div className="grid gap-4 sm:grid-cols-3">
@@ -120,20 +135,19 @@ export function FormularioProduto({
               required
               maxLength={60}
               placeholder="Ex: 8005"
+              aria-describedby={duplicadoDe ? "aviso-referencia" : undefined}
               className={CAMPO}
             />
+            {duplicadoDe && (
+              <span id="aviso-referencia" className="text-xs font-medium text-alerta-texto">
+                Duplicado de ref. {duplicadoDe.modelo} — informe a nova referência.
+              </span>
+            )}
           </label>
 
-          <label className="flex flex-col gap-1.5 sm:col-span-3">
-            <span className="text-sm font-medium text-texto">Descrição</span>
-            <textarea
-              name="descricao"
-              defaultValue={p.descricao ?? ""}
-              rows={3}
-              placeholder="Composição, caimento, detalhes que ajudem o lojista a decidir."
-              className={`${CAMPO} h-auto py-2.5`}
-            />
-          </label>
+          <div className="sm:col-span-3">
+            <EditorDescricao inicial={p.descricao ?? ""} />
+          </div>
 
           <label className="flex flex-col gap-1.5 sm:col-span-3">
             <span className="text-sm font-medium text-texto">
@@ -166,7 +180,7 @@ export function FormularioProduto({
             >
               <option value="">Escolha…</option>
               {listas.categorias.map((c) => (
-                <option key={c.id} value={c.id}>{c.nome}</option>
+                <option key={c.id} value={c.id}>{rotuloOpcao(c.nome, c.ativo)}</option>
               ))}
             </select>
           </label>
@@ -182,7 +196,7 @@ export function FormularioProduto({
             >
               <option value="">Nenhuma</option>
               {subsVisiveis.map((s) => (
-                <option key={s.id} value={s.id}>{s.nome}</option>
+                <option key={s.id} value={s.id}>{rotuloOpcao(s.nome, s.ativo)}</option>
               ))}
             </select>
           </label>
@@ -196,7 +210,7 @@ export function FormularioProduto({
             >
               <option value="">Nenhum</option>
               {listas.fabricantes.map((f) => (
-                <option key={f.id} value={f.id}>{f.nome}</option>
+                <option key={f.id} value={f.id}>{rotuloOpcao(f.nome, f.ativo, "o")}</option>
               ))}
             </select>
           </label>
@@ -213,7 +227,7 @@ export function FormularioProduto({
               <option value="">Escolha…</option>
               {listas.kits.map((k) => (
                 <option key={k.id} value={k.id}>
-                  {k.pecas} {k.pecas === 1 ? "peça" : "peças"}
+                  {rotuloOpcao(`${k.pecas} ${k.pecas === 1 ? "peça" : "peças"}`, k.ativo, "o")}
                 </option>
               ))}
             </select>
@@ -319,10 +333,17 @@ export function FormularioProduto({
         </div>
       </Secao>
 
+      {duplicadoDe && (
+        <p className="rounded-lg border border-borda bg-superficie-2 px-3.5 py-2.5 text-sm text-suave">
+          As fotos não são copiadas. Depois de cadastrar, você cai na ficha do
+          produto novo e adiciona as fotos dele lá.
+        </p>
+      )}
+
       {estado.erro && <Aviso mensagem={estado.erro} />}
 
       <div className="sticky bottom-0 -mx-1 flex items-center gap-3 border-t border-borda bg-fundo/95 px-1 py-3 backdrop-blur">
-        <BotaoSalvar rotulo={rotulo} />
+        <BotaoSalvar rotulo={rotulo} salvando={salvando} />
         {estado.ok && (
           <span role="status" className="text-sm font-medium text-ok-texto">
             Salvo.

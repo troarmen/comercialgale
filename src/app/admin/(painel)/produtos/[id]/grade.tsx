@@ -5,7 +5,8 @@ import { CAMPO } from "@/components/cadastro-ui";
 import { reais } from "@/lib/formato";
 import { NOME_TIPO, TIPOS } from "@/lib/tamanhos";
 
-export type OpcaoTamanho = { id: number; valor: string; tipo: string };
+/** `ativo: false` só chega quando o tamanho já está na grade deste produto. */
+export type OpcaoTamanho = { id: number; valor: string; tipo: string; ativo?: boolean };
 
 export type LinhaGrade = {
   tamanho_id: number;
@@ -45,9 +46,13 @@ export function Grade({
   // Agrupado por tipo: a lista herdada tem 120 valores misturando tamanho,
   // numeração de pé, faixa etária, grade e cor. Separar em blocos deixa o
   // seletor navegável sem mudar nada do que o Arthur já conhece.
+  // Tamanho desativado não é oferecido para entrar na grade; só continua
+  // listado (como "já está na grade") se este produto ainda o usa.
   const grupos = TIPOS.map((t) => ({
     nome: t.nome,
-    itens: tamanhos.filter((x) => x.tipo === t.valor),
+    itens: tamanhos.filter(
+      (x) => x.tipo === t.valor && (x.ativo !== false || usados.has(x.id)),
+    ),
   })).filter((g) => g.itens.length);
 
   function adicionar(id: number) {
