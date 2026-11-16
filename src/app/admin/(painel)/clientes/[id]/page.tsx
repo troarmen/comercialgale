@@ -87,6 +87,7 @@ export default async function PaginaCliente({
             temLogin={!!cliente.user_id}
             email={cliente.email}
             podeVerPrecos={cliente.pode_ver_precos}
+            status={cliente.status}
           />
 
           <section className="overflow-hidden rounded-xl border border-borda bg-superficie">

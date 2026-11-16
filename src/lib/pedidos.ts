@@ -91,7 +91,10 @@ export function dataCurta(iso: string | null) {
 
 export function dataHora(iso: string | null) {
   if (!iso) return "—";
+  // Fuso fixo: na Vercel o servidor roda em UTC e o pedido das 21h de
+  // Brasília apareceria com a data e a hora do dia seguinte.
   return new Date(iso).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
