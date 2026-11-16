@@ -69,7 +69,7 @@ export function FiltrosVitrine({
       >
         <option value="">Destaques</option>
         <option value="recentes">Mais recentes</option>
-        <option value="nome">Nome (A–Z)</option>
+        <option value="nome">Marca (A–Z)</option>
       </select>
 
       {temFiltro && (

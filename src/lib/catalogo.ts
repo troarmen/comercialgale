@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { gruposDaBusca } from "@/lib/busca";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
 /**
@@ -172,11 +173,10 @@ export async function listarProdutos(filtros: FiltrosListagem) {
     )
     .eq("ativo", true);
 
-  if (filtros.busca?.trim()) {
-    consulta = consulta.textSearch("busca", filtros.busca.trim(), {
-      type: "websearch",
-      config: "portuguese",
-    });
+  // Nome, referência, descrição, tags, marca e categoria — sem acento e
+  // aceitando pedaço de palavra. Ver src/lib/busca.ts.
+  for (const grupo of await gruposDaBusca(supabase, filtros.busca)) {
+    consulta = consulta.or(grupo);
   }
   if (filtros.categoriaId) consulta = consulta.eq("categoria_id", filtros.categoriaId);
   if (filtros.subcategoriaId)
@@ -188,7 +188,13 @@ export async function listarProdutos(filtros: FiltrosListagem) {
   if (filtros.ordem === "recentes") {
     consulta = consulta.order("created_at", { ascending: false });
   } else if (filtros.ordem === "nome") {
-    consulta = consulta.order("titulo").order("modelo");
+    // A–Z pela MARCA (pedido do cliente, nov/2026): muitos produtos têm o
+    // mesmo nome ("Pijama Infantil"), então o nome sozinho não organiza nada.
+    // Dentro da marca, nome e referência.
+    consulta = consulta
+      .order("fabricantes(nome)", { nullsFirst: false })
+      .order("titulo")
+      .order("modelo");
   } else {
     // padrão: lançamentos abrem a vitrine, o resto em ordem alfabética
     consulta = consulta.order("lancamento", { ascending: false }).order("titulo");

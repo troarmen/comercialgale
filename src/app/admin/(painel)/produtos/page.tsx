@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { FiltrosProdutos } from "@/components/filtros-produtos";
 import { Paginacao } from "@/components/paginacao";
+import { gruposDaBusca } from "@/lib/busca";
 import { faixaPreco, numero, urlFoto } from "@/lib/formato";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
@@ -48,14 +49,10 @@ export default async function PaginaProdutos({
       { count: "exact" },
     );
 
-  if (sp.busca?.trim()) {
-    // Busca no tsvector mantido pelo gatilho: pega título, referência, tags e
-    // descrição de uma vez, com stemming em português ("calcinhas" acha
-    // "calcinha").
-    consulta = consulta.textSearch("busca", sp.busca.trim(), {
-      type: "websearch",
-      config: "portuguese",
-    });
+  // A mesma busca do catálogo: nome, referência, descrição, tags, marca e
+  // categoria, sem acento e aceitando pedaço de palavra (src/lib/busca.ts).
+  for (const grupo of await gruposDaBusca(supabase, sp.busca)) {
+    consulta = consulta.or(grupo);
   }
   // Os filtros chegam como texto na URL e as colunas são numéricas.
   if (sp.categoria) consulta = consulta.eq("categoria_id", Number(sp.categoria));
