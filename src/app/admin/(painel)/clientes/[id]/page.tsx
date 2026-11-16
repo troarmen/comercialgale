@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BotaoVoltar } from "@/components/voltar";
 import { numero, reais } from "@/lib/formato";
 import { STATUS, dataCurta } from "@/lib/pedidos";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -50,13 +51,18 @@ export default async function PaginaCliente({
 
   return (
     <div className="px-8 py-7">
-      <nav className="mb-3 text-sm text-suave">
-        <Link href="/admin/clientes" className="transition hover:text-texto">
-          Clientes
-        </Link>
-        <span className="px-1.5 text-tenue">/</span>
-        <span className="text-texto">{cliente.nome}</span>
-      </nav>
+      {/* Voltar devolve a lista com a busca, a página e a rolagem de antes;
+          a trilha ao lado abre a lista do zero. */}
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <BotaoVoltar chave="clientes" padrao="/admin/clientes" />
+        <nav className="text-sm text-suave">
+          <Link href="/admin/clientes" className="transition hover:text-texto">
+            Clientes
+          </Link>
+          <span className="px-1.5 text-tenue">/</span>
+          <span className="text-texto">{cliente.nome}</span>
+        </nav>
+      </div>
 
       <header className="mb-5">
         <h1 className="text-2xl font-semibold tracking-tight text-texto">

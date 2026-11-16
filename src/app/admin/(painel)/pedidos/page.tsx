@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Paginacao } from "@/components/paginacao";
+import { LembrarLista } from "@/components/voltar";
 import { numero, reais } from "@/lib/formato";
 import {
   ORDEM_STATUS,
@@ -62,6 +63,10 @@ export default async function PaginaPedidos({
 
   return (
     <div className="px-8 py-7">
+      {/* Guarda busca, aba, página e rolagem para o Voltar da ficha do
+          pedido devolver a lista como estava. */}
+      <LembrarLista chave="pedidos" />
+
       <header className="mb-4">
         <h1 className="text-2xl font-semibold tracking-tight text-texto">
           Pedidos

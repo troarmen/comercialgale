@@ -68,12 +68,24 @@ export function LembrarLista({ chave }: { chave: string }) {
       }
     }
 
+    // Ao abrir uma ficha, o Next troca a página e a leva ao topo ANTES de esta
+    // lista desmontar e soltar o ouvinte: sem esta conferência, aquele último
+    // "rolou para 0" sobrescrevia a posição verdadeira e o Voltar caía no
+    // topo (visto no teste: rolagem 569 guardada como 0). O endereço já é o
+    // da ficha nesse momento, então só grava enquanto a URL for a da lista.
+    const aindaNaLista = () => {
+      const aqui = new URLSearchParams(window.location.search).toString();
+      return (aqui ? `${window.location.pathname}?${aqui}` : window.location.pathname) === endereco;
+    };
+
     let quadro = 0;
     const aoRolar = () => {
       cancelAnimationFrame(quadro);
-      quadro = requestAnimationFrame(() =>
-        gravar(chaveRolagem(chave), String(Math.round(window.scrollY))),
-      );
+      quadro = requestAnimationFrame(() => {
+        if (aindaNaLista()) {
+          gravar(chaveRolagem(chave), String(Math.round(window.scrollY)));
+        }
+      });
     };
     window.addEventListener("scroll", aoRolar, { passive: true });
     return () => {

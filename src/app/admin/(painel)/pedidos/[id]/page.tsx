@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BotaoVoltar } from "@/components/voltar";
 import { numero, reais } from "@/lib/formato";
 import { STATUS, clienteDoPedido, dataHora } from "@/lib/pedidos";
 import { perfilEquipe } from "@/lib/sessao";
@@ -54,13 +55,18 @@ export default async function PaginaPedido({
 
   return (
     <div className="px-8 py-7">
-      <nav className="mb-3 text-sm text-suave">
-        <Link href="/admin/pedidos" className="transition hover:text-texto">
-          Pedidos
-        </Link>
-        <span className="px-1.5 text-tenue">/</span>
-        <span className="tabular-nums text-texto">{pedido.numero}</span>
-      </nav>
+      {/* Voltar devolve a lista com a busca, a aba, a página e a rolagem de
+          antes; a trilha ao lado abre a lista do zero. */}
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <BotaoVoltar chave="pedidos" padrao="/admin/pedidos" />
+        <nav className="text-sm text-suave">
+          <Link href="/admin/pedidos" className="transition hover:text-texto">
+            Pedidos
+          </Link>
+          <span className="px-1.5 text-tenue">/</span>
+          <span className="tabular-nums text-texto">{pedido.numero}</span>
+        </nav>
+      </div>
 
       <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div>
