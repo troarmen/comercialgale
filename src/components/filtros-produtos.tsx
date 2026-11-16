@@ -22,12 +22,15 @@ export function FiltrosProdutos({
   const [pendente, iniciar] = useTransition();
 
   const [busca, setBusca] = useState(params.get("busca") ?? "");
-  const primeiraRenderizacao = useRef(true);
+  // "Limpar" já navegou para a lista sem busca; o efeito da digitação não
+  // pode reaplicar depois a busca com os filtros antigos.
+  const limpando = useRef(false);
 
   const categoria = params.get("categoria") ?? "";
   const subcategoria = params.get("subcategoria") ?? "";
   const fabricante = params.get("fabricante") ?? "";
   const status = params.get("status") ?? "";
+  const lancamento = params.get("lancamento") ?? "";
 
   function aplicar(mudancas: Record<string, string>) {
     const novo = new URLSearchParams(params.toString());
@@ -42,11 +45,17 @@ export function FiltrosProdutos({
 
   // Espera a digitação parar antes de consultar. Sem isso, "calcinha" dispara
   // oito buscas no banco.
+  //
+  // Campo igual à URL = nada a aplicar. Isso cobre a montagem, inclusive a
+  // dupla do StrictMode em desenvolvimento: a antiga trava de "primeira
+  // renderização" não sobrevivia a ela, e voltar de uma ficha para a página 2
+  // da lista caía na página 1.
   useEffect(() => {
-    if (primeiraRenderizacao.current) {
-      primeiraRenderizacao.current = false;
+    if (limpando.current) {
+      limpando.current = false;
       return;
     }
+    if (busca === (params.get("busca") ?? "")) return;
     const t = setTimeout(() => aplicar({ busca }), 350);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -58,7 +67,25 @@ export function FiltrosProdutos({
     ? subcategorias.filter((s) => String(s.categoria_id) === categoria)
     : subcategorias;
 
-  const temFiltro = !!(busca || categoria || subcategoria || fabricante || status);
+  const temFiltro = !!(
+    busca || categoria || subcategoria || fabricante || status || lancamento
+  );
+
+  // "Limpar" tira busca e filtros, mas mantém a ordem escolhida no título da
+  // coluna: ela é preferência de leitura, não filtro.
+  function limpar() {
+    const ordem = new URLSearchParams();
+    for (const chave of ["ordem", "dir"]) {
+      const valor = params.get(chave);
+      if (valor) ordem.set(chave, valor);
+    }
+    const resto = ordem.toString();
+    if (busca) limpando.current = true;
+    setBusca("");
+    iniciar(() =>
+      router.replace(`/admin/produtos${resto ? `?${resto}` : ""}`, { scroll: false }),
+    );
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -128,13 +155,23 @@ export function FiltrosProdutos({
         <option value="inativo">Só desativados</option>
       </select>
 
+      {/* Para "tirar de tempos em tempos o que não é mais novidade": filtra
+          os lançamentos, seleciona a página e tira de uma vez. */}
+      <select
+        value={lancamento}
+        aria-label="Lançamento"
+        onChange={(e) => aplicar({ lancamento: e.target.value })}
+        className={CLASSE_CAMPO}
+      >
+        <option value="">Lançamento: todos</option>
+        <option value="sim">Só lançamentos</option>
+        <option value="nao">Fora de lançamento</option>
+      </select>
+
       {temFiltro && (
         <button
           type="button"
-          onClick={() => {
-            setBusca("");
-            iniciar(() => router.replace("/admin/produtos", { scroll: false }));
-          }}
+          onClick={limpar}
           className="h-9 rounded-lg px-3 text-sm text-suave transition hover:bg-superficie-2 hover:text-texto"
         >
           Limpar

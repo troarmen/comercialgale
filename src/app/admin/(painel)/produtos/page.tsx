@@ -1,11 +1,24 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import {
+  CabecalhoOrdenavel,
+  lerOrdem,
+  type Direcao,
+} from "@/components/cabecalho-ordenavel";
 import { FiltrosProdutos } from "@/components/filtros-produtos";
 import { Paginacao } from "@/components/paginacao";
+import { LembrarLista } from "@/components/voltar";
 import { gruposDaBusca } from "@/lib/busca";
 import { faixaPreco, numero, urlFoto } from "@/lib/formato";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import {
+  BarraLote,
+  CaixaLancamento,
+  ListaComLote,
+  MarcarLinha,
+  MarcarTodos,
+} from "./lancamento-lote";
 
 export const metadata: Metadata = { title: "Produtos · Galé Comercial" };
 
@@ -17,8 +30,34 @@ type Busca = {
   subcategoria?: string;
   fabricante?: string;
   status?: string;
+  lancamento?: string;
+  ordem?: string;
+  dir?: string;
   pagina?: string;
 };
+
+/*
+ * Colunas que ordenam a lista e a direção do primeiro clique em cada uma.
+ * Sem `?ordem=` na URL, a lista sai por nome, como sempre saiu.
+ */
+const COLUNAS = {
+  titulo: "asc",
+  modelo: "asc",
+  categoria: "asc",
+  fabricante: "asc",
+  cadastro: "desc",
+} satisfies Record<string, Direcao>;
+
+/*
+ * Data de cadastro em dd/mm/aaaa no fuso de São Paulo. Sem o fuso, o servidor
+ * (UTC na Vercel) mostraria o dia seguinte para quem cadastrou depois das 21h.
+ */
+const DATA = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
 
 export default async function PaginaProdutos({
   searchParams,
@@ -28,6 +67,7 @@ export default async function PaginaProdutos({
   const sp = await searchParams;
   const pagina = Math.max(1, Number(sp.pagina) || 1);
   const de = (pagina - 1) * POR_PAGINA;
+  const ordem = lerOrdem(sp, COLUNAS, { campo: "titulo", dir: "asc" });
 
   const supabase = await criarClienteServidor();
 
@@ -42,7 +82,7 @@ export default async function PaginaProdutos({
   let consulta = supabase
     .from("produtos")
     .select(
-      `id, titulo, modelo, slug, ativo, lancamento,
+      `id, titulo, modelo, slug, ativo, lancamento, created_at,
        categorias(nome), subcategorias(nome), fabricantes(nome),
        kits(pecas),
        produto_imagens(storage_path, principal)`,
@@ -62,10 +102,43 @@ export default async function PaginaProdutos({
     consulta = consulta.eq("fabricante_id", Number(sp.fabricante));
   if (sp.status === "ativo") consulta = consulta.eq("ativo", true);
   if (sp.status === "inativo") consulta = consulta.eq("ativo", false);
+  if (sp.lancamento === "sim") consulta = consulta.eq("lancamento", true);
+  if (sp.lancamento === "nao") consulta = consulta.eq("lancamento", false);
 
+  // Ordem escolhida no título da coluna. Os critérios de desempate ficam
+  // sempre de A a Z (dentro do mesmo fabricante, os produtos por nome), e o
+  // `id` no fim garante que nenhum produto apareça em duas páginas nem suma
+  // entre elas quando vários empatam.
+  const asc = ordem.dir === "asc";
+  // Produto sem categoria/fabricante vai para o fim nas duas direções.
+  const relacionada = { ascending: asc, nullsFirst: false };
+  switch (ordem.campo) {
+    case "modelo":
+      consulta = consulta.order("modelo", { ascending: asc }).order("titulo");
+      break;
+    case "categoria":
+      consulta = consulta
+        .order("categorias(nome)", relacionada)
+        .order("subcategorias(nome)", { nullsFirst: false })
+        .order("titulo");
+      break;
+    case "fabricante":
+      consulta = consulta
+        .order("fabricantes(nome)", relacionada)
+        .order("titulo")
+        .order("modelo");
+      break;
+    case "cadastro":
+      consulta = consulta.order("created_at", { ascending: asc });
+      break;
+    default:
+      consulta = consulta.order("titulo", { ascending: asc }).order("modelo");
+  }
+
+  // Na data, o `id` acompanha a direção: no mesmo dia, o cadastrado por
+  // último aparece primeiro em "mais novos".
   const { data: produtos, count } = await consulta
-    .order("titulo")
-    .order("modelo")
+    .order("id", { ascending: ordem.campo === "cadastro" ? asc : true })
     .range(de, de + POR_PAGINA - 1);
 
   const lista = produtos ?? [];
@@ -106,11 +179,38 @@ export default async function PaginaProdutos({
   const total = count ?? 0;
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const filtrando = !!(
-    sp.busca || sp.categoria || sp.subcategoria || sp.fabricante || sp.status
+    sp.busca ||
+    sp.categoria ||
+    sp.subcategoria ||
+    sp.fabricante ||
+    sp.status ||
+    sp.lancamento
+  );
+
+  // Título de coluna ordenável: mesma lista, mesmos filtros, outra ordem.
+  const titulo = (
+    campo: keyof typeof COLUNAS,
+    rotulo: string,
+    tipo?: "data",
+  ) => (
+    <CabecalhoOrdenavel
+      campo={campo}
+      rotulo={rotulo}
+      ordem={ordem}
+      primeira={COLUNAS[campo]}
+      tipo={tipo}
+      className="px-3"
+      caminho="/admin/produtos"
+      params={sp}
+    />
   );
 
   return (
     <div className="px-8 py-7">
+      {/* Guarda busca, filtros, ordem, página e rolagem para o Voltar da
+          ficha do produto devolver a lista como estava. */}
+      <LembrarLista chave="produtos" />
+
       <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-texto">
@@ -141,128 +241,150 @@ export default async function PaginaProdutos({
         />
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-borda bg-superficie">
-        {lista.length === 0 ? (
-          <div className="px-6 py-16 text-center">
-            <p className="text-sm font-medium text-texto">
-              Nenhum produto encontrado
-            </p>
-            <p className="mt-1 text-sm text-suave">
-              {filtrando
-                ? "Tente afrouxar os filtros ou buscar por outro termo."
-                : "Cadastre o primeiro produto do catálogo."}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-borda text-left text-xs uppercase tracking-wide text-tenue">
-                  <th className="px-4 py-3 font-medium">Produto</th>
-                  <th className="px-4 py-3 font-medium">Categoria</th>
-                  <th className="px-4 py-3 font-medium">Fabricante</th>
-                  <th className="px-4 py-3 text-center font-medium">Kit</th>
-                  <th className="px-4 py-3 text-right font-medium">Atacado (kit)</th>
-                  <th className="px-4 py-3 text-center font-medium">Situação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lista.map((p) => {
-                  const foto =
-                    p.produto_imagens?.find((i) => i.principal) ??
-                    p.produto_imagens?.[0];
-                  const preco = precos.get(p.id);
-                  return (
-                    <tr
-                      key={p.id}
-                      className="border-b border-borda last:border-0 transition hover:bg-superficie-2"
-                    >
-                      <td className="px-4 py-2.5">
-                        <Link
-                          href={`/admin/produtos/${p.id}`}
-                          className="flex items-center gap-3"
-                        >
-                          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-borda bg-superficie-2">
-                            {foto ? (
-                              <Image
-                                src={urlFoto(foto.storage_path)!}
-                                alt=""
-                                fill
-                                sizes="44px"
-                                className="object-cover"
-                              />
-                            ) : (
-                              <span className="flex h-full items-center justify-center text-[10px] text-tenue">
-                                sem foto
-                              </span>
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="truncate font-medium text-texto">
-                                {p.titulo}
-                              </span>
-                              {p.lancamento && (
-                                <span className="shrink-0 rounded bg-acento-texto/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-acento-texto">
-                                  Lanç.
+      <ListaComLote ids={ids}>
+        <BarraLote />
+
+        <div className="overflow-hidden rounded-xl border border-borda bg-superficie">
+          {lista.length === 0 ? (
+            <div className="px-6 py-16 text-center">
+              <p className="text-sm font-medium text-texto">
+                Nenhum produto encontrado
+              </p>
+              <p className="mt-1 text-sm text-suave">
+                {filtrando
+                  ? "Tente afrouxar os filtros ou buscar por outro termo."
+                  : "Cadastre o primeiro produto do catálogo."}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-borda text-left text-xs uppercase tracking-wide text-tenue">
+                    <th scope="col" className="w-10 py-3 pl-4 pr-1">
+                      <MarcarTodos />
+                    </th>
+                    {titulo("titulo", "Produto")}
+                    {titulo("modelo", "Ref.")}
+                    {titulo("categoria", "Categoria")}
+                    {titulo("fabricante", "Fabricante")}
+                    <th scope="col" className="px-3 py-3 text-center font-medium">Kit</th>
+                    <th scope="col" className="px-3 py-3 text-right font-medium">Atacado (kit)</th>
+                    {titulo("cadastro", "Cadastro", "data")}
+                    <th scope="col" className="px-2 py-3 text-center font-medium">Lançamento</th>
+                    <th scope="col" className="px-3 py-3 text-center font-medium">Situação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lista.map((p) => {
+                    const foto =
+                      p.produto_imagens?.find((i) => i.principal) ??
+                      p.produto_imagens?.[0];
+                    const preco = precos.get(p.id);
+                    return (
+                      <tr
+                        key={p.id}
+                        className="border-b border-borda last:border-0 transition hover:bg-superficie-2 has-[[data-selecao]:checked]:bg-superficie-2"
+                      >
+                        <td className="py-2.5 pl-4 pr-1">
+                          <MarcarLinha id={p.id} titulo={p.titulo} />
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <Link
+                            href={`/admin/produtos/${p.id}`}
+                            className="flex items-center gap-3"
+                          >
+                            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-borda bg-superficie-2">
+                              {foto ? (
+                                <Image
+                                  src={urlFoto(foto.storage_path)!}
+                                  alt=""
+                                  fill
+                                  sizes="44px"
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <span className="flex h-full items-center justify-center text-[10px] text-tenue">
+                                  sem foto
                                 </span>
                               )}
                             </div>
+                            {/* A marca "Lanç." que ficava aqui virou a coluna
+                                Lançamento; a referência, coluna própria. */}
+                            <span className="min-w-0 font-medium text-texto">
+                              {p.titulo}
+                            </span>
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2.5 tabular-nums text-suave">
+                          {/* Quase toda referência é curta ("MF 307"); as ~45
+                              longas ("1447 (P) / 1454 (M) / 1461 (G)") quebram
+                              linha em vez de alargar a tabela inteira. */}
+                          <span className="block max-w-36">{p.modelo}</span>
+                        </td>
+                        <td className="px-3 py-2.5 text-suave">
+                          <div className="text-texto">{p.categorias?.nome}</div>
+                          {p.subcategorias?.nome && (
+                            <div className="text-xs">{p.subcategorias.nome}</div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-suave">
+                          {p.fabricantes?.nome ?? "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-center tabular-nums text-suave">
+                          {p.kits?.pecas}{" "}
+                          {p.kits?.pecas === 1 ? "peça" : "peças"}
+                        </td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">
+                          <div className="font-medium text-texto">
+                            {preco ? faixaPreco(preco.min, preco.max) : "—"}
+                          </div>
+                          {preco && (
+                            /* O mesmo cálculo que o cliente vê no catálogo:
+                               preço do kit dividido pelas peças. Mostrar aqui
+                               deixa o Arthur conferir na hora se o valor do kit
+                               faz sentido por peça. */
                             <div className="text-xs text-suave">
-                              ref. {p.modelo}
+                              {/* espaço que não quebra: "/peça" nunca fica
+                                  sozinho na linha de baixo */}
+                              {faixaPreco(preco.unitMin, preco.unitMax)}
+                              {"\u00a0/peça"}
                             </div>
-                          </div>
-                        </Link>
-                      </td>
-                      <td className="px-4 py-2.5 text-suave">
-                        <div className="text-texto">{p.categorias?.nome}</div>
-                        {p.subcategorias?.nome && (
-                          <div className="text-xs">{p.subcategorias.nome}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 text-suave">
-                        {p.fabricantes?.nome ?? "—"}
-                      </td>
-                      <td className="px-4 py-2.5 text-center tabular-nums text-suave">
-                        {p.kits?.pecas}{" "}
-                        {p.kits?.pecas === 1 ? "peça" : "peças"}
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">
-                        <div className="font-medium text-texto">
-                          {preco ? faixaPreco(preco.min, preco.max) : "—"}
-                        </div>
-                        {preco && (
-                          /* O mesmo cálculo que o cliente vê no catálogo:
-                             preço do kit dividido pelas peças. Mostrar aqui
-                             deixa o Arthur conferir na hora se o valor do kit
-                             faz sentido por peça. */
-                          <div className="text-xs text-suave">
-                            {faixaPreco(preco.unitMin, preco.unitMax)} /peça
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 text-center">
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${
-                            p.ativo
-                              ? "bg-ok-fundo text-ok-texto"
-                              : "bg-tenue/15 text-suave"
-                          }`}
-                        >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${p.ativo ? "bg-ok-texto" : "bg-tenue"}`}
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-suave">
+                          {DATA.format(new Date(p.created_at))}
+                        </td>
+                        <td className="px-2 py-1 text-center">
+                          <CaixaLancamento
+                            id={p.id}
+                            marcado={p.lancamento}
+                            titulo={p.titulo}
                           />
-                          {p.ativo ? "Ativo" : "Desativado"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${
+                              p.ativo
+                                ? "bg-ok-fundo text-ok-texto"
+                                : "bg-tenue/15 text-suave"
+                            }`}
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${p.ativo ? "bg-ok-texto" : "bg-tenue"}`}
+                            />
+                            {p.ativo ? "Ativo" : "Desativado"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </ListaComLote>
 
       {paginas > 1 && (
         <Paginacao pagina={pagina} paginas={paginas} total={total} />
