@@ -11,7 +11,9 @@ export function FiltrosClientes() {
   const params = useSearchParams();
   const [pendente, iniciar] = useTransition();
   const [busca, setBusca] = useState(params.get("busca") ?? "");
-  const primeira = useRef(true);
+  // "Limpar" já navegou para a lista sem busca; o efeito da digitação não
+  // pode reaplicar depois a busca com os filtros antigos.
+  const limpando = useRef(false);
 
   function aplicar(mudancas: Record<string, string>) {
     const novo = new URLSearchParams(params.toString());
@@ -23,11 +25,16 @@ export function FiltrosClientes() {
     iniciar(() => router.replace(`/admin/clientes?${novo}`, { scroll: false }));
   }
 
+  // Campo igual à URL = nada a aplicar. Isso cobre a montagem, inclusive a
+  // dupla do StrictMode em desenvolvimento: a antiga trava de "primeira
+  // renderização" não sobrevivia a ela, e voltar de uma ficha para a página 2
+  // da lista caía na página 1.
   useEffect(() => {
-    if (primeira.current) {
-      primeira.current = false;
+    if (limpando.current) {
+      limpando.current = false;
       return;
     }
+    if (busca === (params.get("busca") ?? "")) return;
     const t = setTimeout(() => aplicar({ busca }), 350);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -39,6 +46,22 @@ export function FiltrosClientes() {
     params.get("acesso") ||
     params.get("tipo")
   );
+
+  // "Limpar" tira busca e filtros, mas mantém a ordem escolhida no título da
+  // coluna: ela é preferência de leitura, não filtro.
+  function limpar() {
+    const ordem = new URLSearchParams();
+    for (const chave of ["ordem", "dir"]) {
+      const valor = params.get(chave);
+      if (valor) ordem.set(chave, valor);
+    }
+    const resto = ordem.toString();
+    if (busca) limpando.current = true;
+    setBusca("");
+    iniciar(() =>
+      router.replace(`/admin/clientes${resto ? `?${resto}` : ""}`, { scroll: false }),
+    );
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -98,10 +121,7 @@ export function FiltrosClientes() {
       {temFiltro && (
         <button
           type="button"
-          onClick={() => {
-            setBusca("");
-            iniciar(() => router.replace("/admin/clientes", { scroll: false }));
-          }}
+          onClick={limpar}
           className="h-9 rounded-lg px-3 text-sm text-suave transition hover:bg-superficie hover:text-texto"
         >
           Limpar
