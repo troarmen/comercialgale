@@ -35,7 +35,9 @@ Uso:
     LEGADO_BASE=https://endereco-antigo python3 scripts/recuperar_negrito.py --aplicar  # grava
     GALE_ENV=.env.producao.local LEGADO_BASE=... python3 scripts/recuperar_negrito.py   # banco de produção
 
-    LEGADO_LOGIN / LEGADO_SENHA trocam o login (padrão: o do extrair_legado.py).
+    LEGADO_LOGIN e LEGADO_SENHA são obrigatórios para ler o painel antigo
+    (LEGADO_BASE). O script nunca usa o login escrito no extrair_legado.py:
+    o repositório é público e aquela senha precisa ser trocada.
     LEGADO_IDS=228,1860 limita a alguns produtos (bom para o primeiro teste).
 
 Ensaio é o padrão: lê tudo e mostra o que mudaria, sem gravar. --aplicar
@@ -377,13 +379,21 @@ def fonte_de_html():
             "Informe LEGADO_BASE (endereço do painel antigo, ex.: https://ip-ou-dominio-temporario)\n"
             "ou LEGADO_HTML (pasta com <legado_id>.html). comercialgale.com.br hoje é o site novo."
         )
-    import extrair_legado as legado  # login, retentativa e relogin já resolvidos lá
+    # Login só pelo ambiente. Sem os dois, para aqui — antes de importar o
+    # extrator e de qualquer acesso ao painel antigo — em vez de cair nas constantes
+    # do extrair_legado.py (texto claro num repositório público).
+    login = os.environ.get("LEGADO_LOGIN", "").strip()
+    senha = os.environ.get("LEGADO_SENHA", "")
+    if not login or not senha:
+        raise SystemExit(
+            "Informe LEGADO_LOGIN e LEGADO_SENHA (login do painel antigo) no ambiente.\n"
+            "O script não usa o login gravado no extrair_legado.py."
+        )
+    import extrair_legado as legado  # retentativa e relogin já resolvidos lá
 
-    legado.BASE = base  # a classe Painel lê o endereço deste módulo
-    if os.environ.get("LEGADO_LOGIN"):
-        legado.LOGIN = os.environ["LEGADO_LOGIN"]
-    if os.environ.get("LEGADO_SENHA"):
-        legado.SENHA = os.environ["LEGADO_SENHA"]
+    legado.BASE = base  # a classe Painel lê endereço e login deste módulo
+    legado.LOGIN = login
+    legado.SENHA = senha
     log(f"Fonte: painel antigo em {base}")
     painel = legado.Painel()
 
