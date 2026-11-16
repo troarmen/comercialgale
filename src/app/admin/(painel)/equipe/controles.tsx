@@ -52,11 +52,11 @@ export function NovoColaborador() {
     >
       <h2 className="text-sm font-semibold text-texto">Novo colaborador</h2>
       <p className="mt-1 mb-3 text-sm leading-relaxed text-suave">
-        VÃª a lista e a ficha dos pedidos, com os dados de envio do cliente, e{" "}
+        Vê a lista e a ficha dos pedidos, com os dados de envio do cliente, e{" "}
         <strong className="font-medium text-texto">
-          sÃ³ pode mudar a situaÃ§Ã£o do pedido
+          só pode mudar a situação do pedido
         </strong>
-        . NÃ£o acessa clientes, produtos nem configuraÃ§Ãµes.
+        . Não acessa clientes, produtos nem configurações.
       </p>
       <div className="flex flex-col gap-3">
         <label className="flex flex-col gap-1.5">
@@ -90,7 +90,7 @@ export function NovoColaborador() {
         disabled={pendente || !nome.trim() || !email.trim()}
         className="mt-3 h-10 w-full rounded-lg bg-acento text-sm font-semibold text-white transition hover:bg-acento-forte disabled:opacity-50"
       >
-        {pendente ? "Criandoâ€¦" : "Criar login e enviar convite"}
+        {pendente ? "Criando…" : "Criar login e enviar convite"}
       </button>
     </form>
   );
@@ -130,7 +130,7 @@ export function AcoesColaborador({
           onClick={() => {
             if (
               !confirm(
-                `Remover o login de ${nome}?\n\nEle perde o acesso de vez. Para sÃ³ suspender, use "Desativar".`,
+                `Remover o login de ${nome}?\n\nEle perde o acesso de vez. Para só suspender, use "Desativar".`,
               )
             )
               return;
