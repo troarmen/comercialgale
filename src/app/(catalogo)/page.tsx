@@ -247,8 +247,8 @@ export default async function PaginaInicial() {
                 Lingerie, meias, cuecas e pijamas para abastecer a sua loja
               </h1>
               <p className="mt-4 max-w-lg text-base leading-relaxed text-suave">
-                Direto da {CONTATO.endereco.regiao},
-                em São Paulo — com preço de Atacado e de Varejo para a sua margem.
+                Direto da {CONTATO.endereco.regiao}, em São Paulo, com preço de
+                Atacado e de Varejo
               </p>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
