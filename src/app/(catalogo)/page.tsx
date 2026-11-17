@@ -8,7 +8,6 @@ import { Arara3D, type PecaArara } from "@/components/catalogo/arara-3d";
 import {
   arvoreCategorias,
   configPublica,
-  contarProdutosAtivos,
   fotoDaCategoria,
   listarProdutos,
   marcasComContagem,
@@ -126,13 +125,12 @@ export default async function PaginaInicial() {
   // Banners do painel (Vitrine). Sai junto com as consultas abaixo; com um ou
   // mais ativos, o topo vira carrossel no lugar do banner padrão.
   const promessaBanners = bannersDaLoja();
-  const [categorias, lancamentos, marcas, config, totalProdutos, { cliente }, liberacao] =
+  const [categorias, lancamentos, marcas, config, { cliente }, liberacao] =
     await Promise.all([
       arvoreCategorias(),
       listarProdutos({ lancamentos: true, porPagina: 8, ordem: "recentes" }),
       marcasComContagem(),
       configPublica(),
-      contarProdutosAtivos(),
       sessaoCatalogo(),
       aprovacaoAutomatica(),
     ]);
@@ -249,7 +247,7 @@ export default async function PaginaInicial() {
                 Lingerie, meias, cuecas e pijamas para abastecer a sua loja
               </h1>
               <p className="mt-4 max-w-lg text-base leading-relaxed text-suave">
-                {numero(totalProdutos)} produtos direto da {CONTATO.endereco.regiao},
+                Direto da {CONTATO.endereco.regiao},
                 em São Paulo — com preço de Atacado e de Varejo para a sua margem.
               </p>
 

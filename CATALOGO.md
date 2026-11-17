@@ -327,3 +327,7 @@ três peças do topo com visualização de 180–360°.
 - **Medido** (build de produção, iPhone 13 emulado, 4G lento + CPU 4×, sem
   cache): FCP/LCP 0,8s (o LCP é o h1), CLS 0, ~430 KB no total; sem rolagem
   lateral de 320 a 1440px. Os três recortes somam 73 KB.
+- **Ajustes do cliente (16/11)**: a arara recua do h1 e fica centralizada na
+  coluna (respiro `lg:pl-8 lg:pr-6 xl:pl-20 xl:pr-12`); o trilho termina logo
+  depois das peças no desktop; o texto do topo não mostra mais o número de
+  produtos.

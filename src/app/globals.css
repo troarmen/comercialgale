@@ -369,11 +369,12 @@ body {
   background: linear-gradient(180deg, #ffffff 0%, #d4d6db 40%, #9c9ea6 72%, #e9eaed 100%);
   box-shadow: 0 7px 12px -5px rgb(110 20 35 / 0.4);
 }
+/* no desktop o trilho termina logo depois das peças, sem sobra pela tela
+   (pedido do cliente, nov/2026); no celular ele vai de borda a borda */
 @media (min-width: 1024px) {
-  /* no desktop o trilho sai pela direita da tela, como numa loja */
   .arara-trilho {
-    left: -1.5rem;
-    right: -50vw;
+    left: -0.75rem;
+    right: -0.75rem;
   }
 }
 .arara-vagas {
