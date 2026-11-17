@@ -188,8 +188,7 @@ com preço. E-mails: boas-vindas ao lojista e aviso à casa (`emails_notificacao
   #f7f7f7 removido por floodfill) no cabeçalho/rodapé/gaveta; favicon e
   coração regenerados da arte nova.
 - **Home reorganizada** (padrão e-commerce dos concorrentes indicados):
-  banner enxuto (fotos fixas `HERO_SLUGS` do painel preservadas, com
-  fallback) → mini banners → prateleira de produtos na primeira dobra →
+  banner enxuto (hoje a arara 3D, ver §13) → mini banners → prateleira de produtos na primeira dobra →
   categorias → marcas → como comprar → história. A prateleira usa lançamentos
   QUANDO existem e cai para destaques — em produção `lancamento=false` em
   todo o catálogo (migração não trouxe a flag; ver nota no código).
@@ -259,23 +258,16 @@ corrigir o extrator ou repetir o contorno usado aqui: o endpoint público
 Pedido: mais tons de vermelho e vida nas faixas gelo, sem empilhar camadas.
 A alocação passou por um julgamento por seção (Jev) e por decisão nossa:
 
-- **Hero da home**: ÚNICA instância do **fundo líquido** (`fundo-liquido.tsx`,
-  three.js, fluido pixelizado na rampa gelo → gale-500). Entra pelo porteiro
-  `fundo-liquido-lazy.tsx`: só com ponteiro fino e ≥ 1024px, sem
-  `prefers-reduced-motion`, sem `saveData`/pouca memória, depois do idle;
-  pausa fora da tela e com a aba oculta; `aria-hidden` e sem captura de
-  clique. A máscara `.liquido-mascara` esvazia o fluido atrás do texto.
-  Quem não passa no porteiro vê a `.fundo-aurora` em CSS — ninguém vê buraco.
+- **Hero da home**: era o fundo líquido WebGL; saiu em 16/11/2026 (ver §13).
 - **Como comprar**: `.fundo-aurora-espelhada` + `PadraoPontos tom="marca"`.
 - **Páginas internas**: `.halo-topo` no `<main>` (pseudo-elemento, z-index
   negativo em contexto isolado) — halo de 22rem atrás do título.
 - **Não recebem nada**: prateleira, carrinho, rodapé, formulários — Jev e nós
   concordamos: fundo em movimento atrás de preço, tabela ou campo atrapalha.
 
-Regras: **uma instância WebGL por página, no máximo**; vermelho de fundo
-sempre diluído (≤ 13% em CSS); nunca `object`/canvas acima de conteúdo
-clicável. Custo medido: chunk do three 532 KB / **131 KB gz**, carregado só
-no desktop e só depois do idle; nenhuma página além da home o referencia.
+Regras: vermelho de fundo sempre diluído (≤ 13% em CSS) — exceto o topo da
+home, mais quente desde 16/11 (§13); nunca canvas acima de conteúdo
+clicável. O three.js saiu do projeto junto com o fundo líquido.
 
 
 ## 12. Rodada de alterações do cliente (16/11/2026)
@@ -300,3 +292,38 @@ Relatório "Site de Atacado Galé — Alterações solicitadas" (Arthur), 13 ite
 
 Login LOCAL de admin para QA (só no Supabase local): `admin@teste.local` /
 `gale-admin-local-2026`.
+
+## 13. Topo da home: arara 3D (16/11/2026)
+
+Pedido: fundo do topo mais rosado, sem as ondas que seguiam o mouse, e as
+três peças do topo com visualização de 180–360°.
+
+- **Fundo**: `.fundo-hero` em CSS puro (base rosa em degradê, halos de
+  gale-500/gale-400 mais fortes e uma luz clara atrás da arara). O fundo
+  líquido (`fundo-liquido*.tsx`) e a dependência `three` foram removidos.
+- **Arara**: `src/components/catalogo/arara-3d.tsx` + bloco `.arara-*` no
+  `globals.css`. CSS 3D, sem WebGL: cada peça é um recorte transparente
+  empilhado em 6 camadas (frente, miolo escuro que vira a espessura de lado,
+  costas espelhadas e um tom abaixo). O catálogo só tem foto de frente, então
+  as costas são essa aproximação. Arrastar (mouse ou dedo, `touch-action:
+  pan-y` para não travar a rolagem) gira livre; soltou, segue no embalo e
+  volta de frente depois de ~2,6s. Clique sem arrasto abre a ficha; setas do
+  teclado giram 45°. Uma volta de apresentação na peça do meio quando a arara
+  aparece; nada automático com `prefers-reduced-motion`.
+- **Peças** (constante `ARARA` em `src/app/(catalogo)/page.tsx`): Sutiã
+  Blue Rose 9189, Camisola Desafio 02 e Cueca Boxer Dom Marco 8520 — três
+  lançamentos de categorias diferentes, fotografados soltos em fundo branco
+  (os que recortam bem) e em cores que conversam com o rosa. Substituem o
+  antigo `HERO_SLUGS`. Peça que sair do ar some da arara; com banner ativo
+  na Vitrine, a arara nem é montada.
+- **Trocar uma peça**: `python3 scripts/recortar_arara.py <url-da-foto>
+  public/arara/<nome>.webp` (opções `--apagar` e `--buracos` documentadas no
+  script), conferir o recorte sobre fundo colorido e ajustar a linha em
+  `ARARA` (largura/altura do arquivo, `escala`, `cabide`).
+- **SEO da home**: título `Atacado de Lingerie e Moda Íntima em SP | Comercial
+  Galé` (56 caracteres, 530px; o anterior tinha 715px e saía cortado) e
+  descrição de 137 caracteres / 893px, medidos em Arial como o Google desenha.
+  O mesmo título virou o `default` do layout.
+- **Medido** (build de produção, iPhone 13 emulado, 4G lento + CPU 4×, sem
+  cache): FCP/LCP 0,8s (o LCP é o h1), CLS 0, ~430 KB no total; sem rolagem
+  lateral de 320 a 1440px. Os três recortes somam 73 KB.

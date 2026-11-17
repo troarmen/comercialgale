@@ -4,7 +4,7 @@ import Link from "next/link";
 import { CarrosselBanners } from "@/components/catalogo/carrossel-banners";
 import { CartaoProduto, GradeProdutos } from "@/components/catalogo/cartao-produto";
 import { BrilhoMarca, PadraoPontos } from "@/components/catalogo/decorativos";
-import { FundoLiquidoLazy } from "@/components/catalogo/fundo-liquido-lazy";
+import { Arara3D, type PecaArara } from "@/components/catalogo/arara-3d";
 import {
   arvoreCategorias,
   configPublica,
@@ -22,9 +22,68 @@ import { linkWhatsApp } from "@/lib/seo";
 import { bannersDaLoja } from "@/lib/vitrine";
 import { aprovacaoAutomatica } from "./cadastro/servidor";
 
+/*
+ * Título e descrição medidos para caber inteiros no resultado do Google
+ * (nov/2026), em Arial como o Google desenha: título com 56 caracteres e
+ * 530px (o corte fica perto de 580px; o anterior tinha 715px e saía cortado)
+ * e descrição com 137 caracteres e 893px (corte perto de 920px). O essencial
+ * vem primeiro porque o celular mostra um pouco menos. "70 marcas" é o que o
+ * catálogo tem hoje (72). `absolute` para o modelo "%s | Comercial Galé" não
+ * duplicar a marca.
+ */
+const TITULO_HOME = "Atacado de Lingerie e Moda Íntima em SP | Comercial Galé";
+const DESCRICAO_HOME =
+  "Lingerie, meias, cuecas e pijamas no atacado desde 1976, na região da 25 de Março (SP). Mais de 70 marcas, com preço de Atacado e Varejo.";
+
 export const metadata: Metadata = {
+  title: { absolute: TITULO_HOME },
+  description: DESCRICAO_HOME,
   alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: "Comercial Galé",
+    locale: "pt_BR",
+    url: "/",
+    title: TITULO_HOME,
+    description: DESCRICAO_HOME,
+  },
 };
+
+/*
+ * Peças da arara 3D do topo (nov/2026). Escolhidas a dedo no catálogo: as
+ * três são lançamentos, de categorias diferentes (Lingerie, Pijamas,
+ * Cuecas), fotografadas soltas em fundo branco — as únicas que recortam bem
+ * para ficar "penduradas" — e em cores que conversam com o rosa do fundo.
+ * O recorte transparente fica em public/arara/ (scripts/recortar_arara.py);
+ * para trocar uma peça, gere o recorte novo e ajuste a linha aqui. Peça que
+ * sair do ar some da arara sozinha.
+ */
+const ARARA = [
+  {
+    slug: "sutia-adulto-9189",
+    recorte: "/arara/arara-sutia-blue-rose-9189.webp",
+    largura: 584,
+    altura: 600,
+    escala: 90,
+    cabide: "alca",
+  },
+  {
+    slug: "camisola-feminina-02",
+    recorte: "/arara/arara-camisola-desafio-02.webp",
+    largura: 426,
+    altura: 600,
+    escala: 80,
+    cabide: "alca",
+  },
+  {
+    slug: "cueca-boxer-adulto-8520",
+    recorte: "/arara/arara-cueca-dom-marco-8520.webp",
+    largura: 600,
+    altura: 533,
+    escala: 96,
+    cabide: "presilha",
+  },
+] as const;
 
 /*
  * Home reorganizada no padrão de e-commerce pedido pelo cliente (out/2026):
@@ -104,38 +163,29 @@ export default async function PaginaInicial() {
   const fotoDe = new Map(fotosCategorias.map((f) => [f.id, f.foto]));
   const clienteAtivo = !!cliente && cliente.status === "ativo";
 
-  /*
-   * Fotos do hero: três peças escolhidas a dedo, na ordem [centro, esquerda,
-   * direita]. São produtos de fundo branco de estúdio e de categorias
-   * diferentes, para o empilhamento ler como variedade de estoque. Fixo porque
-   * a ordem alfabética entregava peças repetidas; o catálogo entra como rede
-   * de segurança se algum destes sair do ar.
-   */
-  const HERO_SLUGS = [
-    "tanga-adulto-3600",
-    "meia-soquete-feminina-mf-302-a",
-    "meia-soquete-feminina-mf-307",
-  ];
-
   const banners = await promessaBanners;
   const comBanners = banners.length > 0;
 
-  // Com banner do painel no topo, as fotos do banner padrão nem são buscadas.
-  const escolhidos = comBanners
+  // Com banner do painel no topo, a arara nem é montada.
+  const arara: PecaArara[] = comBanners
     ? []
-    : (await Promise.all(HERO_SLUGS.map(produtoPorSlug)))
-        .map((p) => ({ foto: p?.produto_imagens[0] }))
-        .filter((d) => d.foto);
-
-  const destaqueFotos =
-    comBanners || escolhidos.length >= 3
-      ? escolhidos
-      : (await listarProdutos({ porPagina: 12, ordem: "destaques" })).produtos
-          .map((p) => ({
-            foto: p.produto_imagens.find((i) => i.principal) ?? p.produto_imagens[0],
-          }))
-          .filter((d) => d.foto)
-          .slice(0, 3);
+    : (await Promise.all(ARARA.map((a) => produtoPorSlug(a.slug)))).flatMap((p, i) => {
+        if (!p) return [];
+        const a = ARARA[i];
+        const marca = p.fabricantes?.nome;
+        return [
+          {
+            href: `/produto/${p.slug}`,
+            nome: `${p.titulo} ${p.modelo}${marca ? `, ${marca}` : ""}`,
+            etiqueta: marca ? `${marca} · ${p.modelo}` : `Ref. ${p.modelo}`,
+            recorte: a.recorte,
+            largura: a.largura,
+            altura: a.altura,
+            escala: a.escala,
+            cabide: a.cabide,
+          },
+        ];
+      });
 
   const minis = [
     {
@@ -185,14 +235,12 @@ export default async function PaginaInicial() {
         </div>
       ) : (
         /*
-          Fundo em duas camadas que se substituem, não se somam: a aurora em CSS
-          pinta no primeiro quadro para todo mundo; o fluido pixelizado entra só
-          no desktop com ponteiro, depois do idle, mascarado para longe do texto.
+          Fundo rosado em CSS puro (.fundo-hero) e a arara 3D à direita — no
+          celular, logo abaixo do texto. O fundo líquido que seguia o mouse
+          saiu a pedido do cliente (nov/2026).
         */
-        <section className="fundo-aurora relative overflow-hidden border-b border-borda bg-superficie">
-          <FundoLiquidoLazy className="liquido-mascara" />
-
-          <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-10 lg:grid-cols-[1.1fr_1fr] lg:py-14">
+        <section className="fundo-hero relative overflow-hidden border-b border-borda">
+          <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-4 pb-6 pt-8 lg:grid-cols-[1fr_1.15fr] lg:gap-10 lg:py-12">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-acento-texto">
                 Super atacado de moda íntima · 50 anos
@@ -229,50 +277,7 @@ export default async function PaginaInicial() {
               </p>
             </div>
 
-            {/* Composição em camadas: fotos empilhadas como volumes de estoque.
-                Só no desktop — no celular o banner é texto e a vitrine vem logo. */}
-            {destaqueFotos.length >= 3 && (
-              <div className="relative hidden h-[380px] lg:block" aria-hidden="true">
-                <div className="absolute left-0 top-12 w-44 -rotate-6 overflow-hidden rounded-2xl bg-white shadow-suave ring-1 ring-borda">
-                  <div className="relative aspect-square">
-                    <Image
-                      src={urlFoto(destaqueFotos[1].foto!.storage_path)!}
-                      alt=""
-                      fill
-                      sizes="176px"
-                      priority
-                      className="object-contain p-2"
-                    />
-                  </div>
-                </div>
-
-                <div className="absolute left-1/2 top-0 z-10 w-60 -translate-x-1/2 rotate-1 overflow-hidden rounded-3xl bg-white shadow-flutuante ring-1 ring-borda">
-                  <div className="relative aspect-square">
-                    <Image
-                      src={urlFoto(destaqueFotos[0].foto!.storage_path)!}
-                      alt=""
-                      fill
-                      sizes="240px"
-                      priority
-                      className="object-contain p-2"
-                    />
-                  </div>
-                </div>
-
-                <div className="absolute right-0 top-32 w-40 rotate-6 overflow-hidden rounded-2xl bg-white shadow-suave ring-1 ring-borda">
-                  <div className="relative aspect-square">
-                    <Image
-                      src={urlFoto(destaqueFotos[2].foto!.storage_path)!}
-                      alt=""
-                      fill
-                      sizes="160px"
-                      priority
-                      className="object-contain p-2"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
+            {arara.length > 0 && <Arara3D pecas={arara} />}
           </div>
         </section>
       )}

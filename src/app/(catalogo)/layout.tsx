@@ -18,8 +18,8 @@ const scriptTemaClaro = `document.documentElement.dataset.tema = "claro";`;
 export const metadata: Metadata = {
   metadataBase: new URL(URL_SITE),
   title: {
-    default:
-      "Comercial Galé — Atacado de Lingerie, Meias, Cuecas e Pijamas em São Paulo",
+    // o da home, que cabe no Google (ver page.tsx da home)
+    default: "Atacado de Lingerie e Moda Íntima em SP | Comercial Galé",
     template: "%s | Comercial Galé",
   },
   description:
