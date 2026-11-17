@@ -240,7 +240,7 @@ export default async function PaginaInicial() {
           saiu a pedido do cliente (nov/2026).
         */
         <section className="fundo-hero relative overflow-hidden border-b border-borda">
-          <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-4 pb-6 pt-8 lg:grid-cols-[1fr_1.15fr] lg:gap-10 lg:py-12">
+          <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-4 pb-6 pt-8 lg:grid-cols-[1fr_1.15fr] lg:gap-12 lg:py-12">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-acento-texto">
                 Super atacado de moda íntima · 50 anos
@@ -277,7 +277,15 @@ export default async function PaginaInicial() {
               </p>
             </div>
 
-            {arara.length > 0 && <Arara3D pecas={arara} />}
+            {/* No desktop a arara recua do h1 e fica centralizada na coluna
+                da direita (pedido do cliente, nov/2026). O respiro à direita
+                também guarda espaço para a etiqueta da última peça, que pende
+                para fora; o trilho continua saindo pela borda da tela. */}
+            {arara.length > 0 && (
+              <div className="lg:pl-8 lg:pr-6 xl:pl-20 xl:pr-12">
+                <Arara3D pecas={arara} />
+              </div>
+            )}
           </div>
         </section>
       )}

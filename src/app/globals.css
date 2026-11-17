@@ -564,6 +564,14 @@ body {
     display: inline;
   }
 }
+/* notebook estreito (1024–1279px): a coluna da arara é a mais apertada de
+   todas e as etiquetas no tamanho cheio encostavam na peça vizinha */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .arara-etiqueta {
+    font-size: 8.5px;
+    padding: 2px 5px 2px 10px;
+  }
+}
 @media (max-width: 639px) {
   .arara {
     --gancho: 34px;
