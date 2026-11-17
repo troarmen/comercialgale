@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { CarrosselBanners } from "@/components/catalogo/carrossel-banners";
 import { CartaoProduto, GradeProdutos } from "@/components/catalogo/cartao-produto";
 import { BrilhoMarca, PadraoPontos } from "@/components/catalogo/decorativos";
-import { Arara3D, type PecaArara } from "@/components/catalogo/arara-3d";
+import { TopoBanners } from "@/components/catalogo/topo-banners";
 import {
   arvoreCategorias,
   configPublica,
@@ -12,7 +11,6 @@ import {
   listarProdutos,
   marcasComContagem,
   precosPorProduto,
-  produtoPorSlug,
   sessaoCatalogo,
 } from "@/lib/catalogo";
 import { CONTATO } from "@/lib/contato";
@@ -47,42 +45,6 @@ export const metadata: Metadata = {
     description: DESCRICAO_HOME,
   },
 };
-
-/*
- * Peças da arara 3D do topo (nov/2026). Escolhidas a dedo no catálogo: as
- * três são lançamentos, de categorias diferentes (Lingerie, Pijamas,
- * Cuecas), fotografadas soltas em fundo branco — as únicas que recortam bem
- * para ficar "penduradas" — e em cores que conversam com o rosa do fundo.
- * O recorte transparente fica em public/arara/ (scripts/recortar_arara.py);
- * para trocar uma peça, gere o recorte novo e ajuste a linha aqui. Peça que
- * sair do ar some da arara sozinha.
- */
-const ARARA = [
-  {
-    slug: "sutia-adulto-9189",
-    recorte: "/arara/arara-sutia-blue-rose-9189.webp",
-    largura: 584,
-    altura: 600,
-    escala: 90,
-    cabide: "alca",
-  },
-  {
-    slug: "camisola-feminina-02",
-    recorte: "/arara/arara-camisola-desafio-02.webp",
-    largura: 426,
-    altura: 600,
-    escala: 80,
-    cabide: "alca",
-  },
-  {
-    slug: "cueca-boxer-adulto-8520",
-    recorte: "/arara/arara-cueca-dom-marco-8520.webp",
-    largura: 600,
-    altura: 533,
-    escala: 96,
-    cabide: "presilha",
-  },
-] as const;
 
 /*
  * Home reorganizada no padrão de e-commerce pedido pelo cliente (out/2026):
@@ -122,8 +84,8 @@ function passos(automatico: boolean) {
 }
 
 export default async function PaginaInicial() {
-  // Banners do painel (Vitrine). Sai junto com as consultas abaixo; com um ou
-  // mais ativos, o topo vira carrossel no lugar do banner padrão.
+  // Banners do topo (painel → Vitrine; sem nenhum ativo, os padrão). Sai
+  // junto com as consultas abaixo.
   const promessaBanners = bannersDaLoja();
   const [categorias, lancamentos, marcas, config, { cliente }, liberacao] =
     await Promise.all([
@@ -162,28 +124,6 @@ export default async function PaginaInicial() {
   const clienteAtivo = !!cliente && cliente.status === "ativo";
 
   const banners = await promessaBanners;
-  const comBanners = banners.length > 0;
-
-  // Com banner do painel no topo, a arara nem é montada.
-  const arara: PecaArara[] = comBanners
-    ? []
-    : (await Promise.all(ARARA.map((a) => produtoPorSlug(a.slug)))).flatMap((p, i) => {
-        if (!p) return [];
-        const a = ARARA[i];
-        const marca = p.fabricantes?.nome;
-        return [
-          {
-            href: `/produto/${p.slug}`,
-            nome: `${p.titulo} ${p.modelo}${marca ? `, ${marca}` : ""}`,
-            etiqueta: marca ? `${marca} · ${p.modelo}` : `Ref. ${p.modelo}`,
-            recorte: a.recorte,
-            largura: a.largura,
-            altura: a.altura,
-            escala: a.escala,
-            cabide: a.cabide,
-          },
-        ];
-      });
 
   const minis = [
     {
@@ -219,74 +159,47 @@ export default async function PaginaInicial() {
   return (
     <>
       {/* ------------------------------------------------- banner principal */}
-      {comBanners ? (
-        /*
-          Banners do painel (Vitrine). O h1 da página continua existindo, só
-          que para leitor de tela e buscador: a arte do banner é imagem, e a
-          página não pode ficar sem título principal.
-        */
-        <div className="mx-auto max-w-7xl px-4 pt-4 sm:pt-6">
-          <h1 className="sr-only">
-            Lingerie, meias, cuecas e pijamas para abastecer a sua loja
-          </h1>
-          <CarrosselBanners banners={banners} />
+      {/*
+        Topo: o texto abaixo é o h1 da página e vive no HTML, nunca dentro de
+        uma arte. Os banners do painel (Vitrine) passam em volta dele — no
+        celular embaixo do texto, em tela larga como fundo do topo inteiro.
+        Sem nenhum banner ativo no painel, entram os dois padrão.
+      */}
+      <TopoBanners banners={banners}>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-acento-texto">
+          Super atacado de moda íntima · 50 anos
+        </p>
+        <h1 className="mt-3 max-w-xl text-3xl font-bold leading-tight tracking-tight text-texto sm:text-5xl">
+          Lingerie, meias, cuecas e pijamas para abastecer a sua loja
+        </h1>
+        <p className="mt-4 max-w-lg text-base leading-relaxed text-suave">
+          Direto da {CONTATO.endereco.regiao}, em São Paulo, com preço de
+          Atacado e de Varejo
+        </p>
+
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <Link
+            href="/produtos"
+            className="flex h-12 items-center rounded-full bg-acento px-6 text-sm font-semibold text-white shadow-cta transition duration-200 hover:-translate-y-0.5 hover:bg-acento-forte"
+          >
+            Ver catálogo
+          </Link>
+          {!clienteAtivo && (
+            <Link
+              href="/cadastro"
+              className="flex h-12 items-center rounded-full border border-borda-forte bg-superficie px-6 text-sm font-semibold text-texto transition duration-200 hover:-translate-y-0.5 hover:border-texto hover:shadow-pousada"
+            >
+              Quero comprar no atacado
+            </Link>
+          )}
         </div>
-      ) : (
-        /*
-          Fundo rosado em CSS puro (.fundo-hero) e a arara 3D à direita — no
-          celular, logo abaixo do texto. O fundo líquido que seguia o mouse
-          saiu a pedido do cliente (nov/2026).
-        */
-        <section className="fundo-hero relative overflow-hidden border-b border-borda">
-          <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-4 pb-6 pt-8 lg:grid-cols-[1fr_1.15fr] lg:gap-12 lg:py-12">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-acento-texto">
-                Super atacado de moda íntima · 50 anos
-              </p>
-              <h1 className="mt-3 max-w-xl text-3xl font-bold leading-tight tracking-tight text-texto sm:text-5xl">
-                Lingerie, meias, cuecas e pijamas para abastecer a sua loja
-              </h1>
-              <p className="mt-4 max-w-lg text-base leading-relaxed text-suave">
-                Direto da {CONTATO.endereco.regiao}, em São Paulo, com preço de
-                Atacado e de Varejo
-              </p>
 
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                <Link
-                  href="/produtos"
-                  className="flex h-12 items-center rounded-full bg-acento px-6 text-sm font-semibold text-white shadow-cta transition duration-200 hover:-translate-y-0.5 hover:bg-acento-forte"
-                >
-                  Ver catálogo
-                </Link>
-                {!clienteAtivo && (
-                  <Link
-                    href="/cadastro"
-                    className="flex h-12 items-center rounded-full border border-borda-forte bg-superficie px-6 text-sm font-semibold text-texto transition duration-200 hover:-translate-y-0.5 hover:border-texto hover:shadow-pousada"
-                  >
-                    Quero comprar no atacado
-                  </Link>
-                )}
-              </div>
-
-              <p className="mt-4 text-sm text-suave">
-                Venda em embalagens fechadas
-                {config.pedidoMinimo > 0 &&
-                  ` · compras no atacado a partir de ${reais(config.pedidoMinimo)}`}
-              </p>
-            </div>
-
-            {/* No desktop a arara recua do h1 e fica centralizada na coluna
-                da direita (pedido do cliente, nov/2026). O respiro à direita
-                também guarda espaço para a etiqueta da última peça, que pende
-                para fora; o trilho continua saindo pela borda da tela. */}
-            {arara.length > 0 && (
-              <div className="lg:pl-8 lg:pr-6 xl:pl-20 xl:pr-12">
-                <Arara3D pecas={arara} />
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+        <p className="mt-4 text-sm text-suave">
+          Venda em embalagens fechadas
+          {config.pedidoMinimo > 0 &&
+            ` · compras no atacado a partir de ${reais(config.pedidoMinimo)}`}
+        </p>
+      </TopoBanners>
 
       {/* ----------------------------------------------------- mini banners */}
       <section className="mx-auto max-w-7xl px-4 pt-6" aria-label="Atalhos">

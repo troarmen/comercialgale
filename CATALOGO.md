@@ -284,7 +284,7 @@ Relatório "Site de Atacado Galé — Alterações solicitadas" (Arthur), 13 ite
 | 6 | Lista de clientes: data de cadastro | `admin/(painel)/clientes/page.tsx` |
 | 7 | Duplicar produto | `/admin/produtos/novo?de=<id>` (sem fotos; ref. nova obrigatória) |
 | 8 | Botão Voltar com a lista como estava | `src/components/voltar.tsx` |
-| 9 | Banners em loop no topo | tela **Vitrine** + `carrossel-banners.tsx`; sem banner = topo antigo |
+| 9 | Banners em loop no topo | tela **Vitrine** + `topo-banners.tsx` (ver §14); sem banner ativo = banners padrão |
 | 10 | Trocar o logo | tela **Vitrine** |
 | 11 | Cadastro com aprovação automática | §5 |
 | 12 | A–Z pela marca | `listarProdutos` ordem `nome` = `fabricantes(nome)` |
@@ -293,10 +293,12 @@ Relatório "Site de Atacado Galé — Alterações solicitadas" (Arthur), 13 ite
 Login LOCAL de admin para QA (só no Supabase local): `admin@teste.local` /
 `gale-admin-local-2026`.
 
-## 13. Topo da home: arara 3D (16/11/2026)
+## 13. Topo da home: arara 3D (16/11/2026) — SUBSTITUÍDA pelos banners (§14)
 
 Pedido: fundo do topo mais rosado, sem as ondas que seguiam o mouse, e as
-três peças do topo com visualização de 180–360°.
+três peças do topo com visualização de 180–360°. Ficou no ar de 16 a 17/11;
+o cliente preferiu banners (§14) e o componente saiu. Seguem valendo: o
+`.fundo-hero`, a saída do fundo líquido/`three` e o SEO da home.
 
 - **Fundo**: `.fundo-hero` em CSS puro (base rosa em degradê, halos de
   gale-500/gale-400 mais fortes e uma luz clara atrás da arara). O fundo
@@ -316,10 +318,8 @@ três peças do topo com visualização de 180–360°.
   (os que recortam bem) e em cores que conversam com o rosa. Substituem o
   antigo `HERO_SLUGS`. Peça que sair do ar some da arara; com banner ativo
   na Vitrine, a arara nem é montada.
-- **Trocar uma peça**: `python3 scripts/recortar_arara.py <url-da-foto>
-  public/arara/<nome>.webp` (opções `--apagar` e `--buracos` documentadas no
-  script), conferir o recorte sobre fundo colorido e ajustar a linha em
-  `ARARA` (largura/altura do arquivo, `escala`, `cabide`).
+- **Recortes**: o script virou `scripts/recortar_peca.py` e os recortes
+  foram para `design/banners-padrao/pecas/` (usados nos banners padrão).
 - **SEO da home**: título `Atacado de Lingerie e Moda Íntima em SP | Comercial
   Galé` (56 caracteres, 530px; o anterior tinha 715px e saía cortado) e
   descrição de 137 caracteres / 893px, medidos em Arial como o Google desenha.
@@ -331,3 +331,41 @@ três peças do topo com visualização de 180–360°.
   coluna (respiro `lg:pl-8 lg:pr-6 xl:pl-20 xl:pr-12`); o trilho termina logo
   depois das peças no desktop; o texto do topo não mostra mais o número de
   produtos.
+
+## 14. Topo da home: banners do painel (17/11/2026)
+
+Decisão do cliente (Arthur, 17/11): o topo vira banner, para a equipe
+personalizar por produto e por estação; por ora, um banner genérico por
+categoria, sem promoção. Pedido nosso: o h1 não muda e continua texto no HTML.
+
+- **Componente**: `src/components/catalogo/topo-banners.tsx` (substitui
+  `carrossel-banners.tsx` e `arara-3d.tsx`). O texto do topo (eyebrow, h1,
+  chamada, botões) é renderizado no servidor em `page.tsx` e entra como
+  `children`; o componente só põe os banners em volta. Antes, com banner, o
+  h1 virava `sr-only` — agora é sempre visível.
+- **Arranjos**: até 1023px, texto e embaixo o quadro quadrado (imagem de
+  celular; sem ela, recorte do lado direito da de computador,
+  `object-[88%_50%]`); 1024–1279px, texto à esquerda e o quadro à direita;
+  ≥1280px, o banner 3:1 é o fundo do topo inteiro com o texto por cima, um
+  véu rosa (`.topo-banners-veu`) sob o texto e, acima de 1920px, a arte
+  centralizada com as laterais esmaecendo (`.topo-banners-faixa`).
+- **Carrossel**: troca por esmaecimento a cada 6s; pausa com mouse em cima,
+  foco de teclado, aba oculta e `prefers-reduced-motion`; botão de pausa,
+  setas, pontinhos, deslizar no celular; slides fora de vista `inert`.
+- **Banners padrão**: `BANNERS_PADRAO` em `src/lib/vitrine.ts` — Lingerie
+  (→ `/produtos/lingerie`) e Cuecas (→ `/produtos/cuecas`), arquivos em
+  `public/banners/`. Entram sempre que o painel não tem banner ATIVO (também
+  se a leitura da vitrine falhar), então não dependem de nada no banco de
+  produção. O painel mostra os dois como "no ar agora"/"guardados".
+- **Gerar/alterar os padrão**: molde `design/banners-padrao/banner.html`
+  (mesmo degradê do `.fundo-hero`, arara com cabides, selo da categoria) e
+  `design/banners-padrao/gerar.mjs` (`MODULOS=<pasta com puppeteer-core>
+  node design/banners-padrao/gerar.mjs`). Regra da arte de computador: metade
+  esquerda livre (é onde o h1 fica), produtos entre 55% e 97% da largura e
+  ~70px de folga em cima e embaixo (cortados em telas ≥1920px).
+- **Painel**: a tela Vitrine explica a regra da metade esquerda, marca a
+  "área do título" na prévia da imagem de computador e lista os padrão.
+- **Medido** (build de produção, iPhone 13, 4G lento + CPU 4×, sem cache):
+  FCP 0,7s, LCP 1,5s (a imagem do banner), CLS 0; sem rolagem lateral de 768 a
+  2560px e no iPhone; troca automática, setas e clique na arte conferidos.
+

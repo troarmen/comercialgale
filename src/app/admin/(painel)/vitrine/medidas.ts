@@ -3,8 +3,10 @@
  * e na loja (a moldura do carrossel). Arquivo puro, sem nada de servidor:
  * o formulário, que roda no navegador, importa daqui.
  *
- * Por que estas: a moldura do banner é 3:1 no computador e quadrada no
- * celular. 1920 px cobre a largura útil da loja (1248 px) com folga para tela
+ * Por que estas: o banner de computador (3:1) é o fundo do topo da home em
+ * tela larga, com o título por cima da metade esquerda; o de celular
+ * (quadrado) fica embaixo do título no celular e ao lado dele em notebook
+ * pequeno. 1920 px cobre a largura útil da loja (1248 px) com folga para tela
  * de alta densidade; 1080 px é o tamanho que o celular do Arthur já exporta
  * para o Instagram, então a arte do feed serve direto.
  */

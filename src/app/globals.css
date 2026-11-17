@@ -262,9 +262,10 @@ body {
  * utilidade usa, e aqui não há utilidade.
  *
  * O topo da home tem a sua versão mais quente (.fundo-hero, pedido do
- * cliente em nov/2026: "mais rosado/avermelhado"): base rosa em degradê, os
- * dois halos mais fortes e uma luz clara atrás da arara, como vitrine
- * iluminada, para as peças destacarem do rosa.
+ * cliente em nov/2026: "mais rosado/avermelhado"): base rosa em degradê e os
+ * dois halos mais fortes. É o fundo da seção atrás dos banners — aparece em
+ * volta do quadro no celular, enquanto a imagem carrega e nas laterais das
+ * telas mais largas que o banner. Os banners padrão usam o mesmo degradê.
  */
 .fundo-hero {
   background-color: #fcecee;
@@ -344,242 +345,38 @@ body {
 }
 
 /*
- * ARARA 3D do topo da home (components/catalogo/arara-3d.tsx). O componente
- * só escreve variáveis (--giro, --balanco, --luz, --escuro, --chao) a cada
- * quadro; a geometria toda mora aqui.
+ * BANNERS DO TOPO (components/catalogo/topo-banners.tsx). A partir de 1280px
+ * o banner de computador é o fundo do topo inteiro e o h1 fica por cima.
  *
- *   .arara-peca      a vaga com perspectiva (o link da ficha)
- *   .arara-balanco   pêndulo 2D com pivô no gancho
- *   .arara-giro      o giro em Y, com gancho, cabide, camadas e etiqueta
- *   .arara-camadas   6 cópias do recorte em Z: frente, miolo escuro, costas
+ *   faixa  em tela mais larga que 1920px (o tamanho do arquivo), a arte para
+ *          de crescer, fica centralizada e esmaece nas laterais para o rosa
+ *          do .fundo-hero — sem isso ela esticaria e cortaria em cima e
+ *          embaixo;
+ *   véu    rosa translúcido sob o texto, que some antes da metade da tela:
+ *          garante a leitura do h1 mesmo que a arte enviada pelo painel não
+ *          deixe o lado esquerdo livre.
  */
-.arara {
-  position: relative;
-  --gancho: 40px;
-  -webkit-user-select: none;
-  user-select: none;
-}
-.arara-trilho {
-  position: absolute;
-  top: 9px;
-  left: -1rem;
-  right: -1rem;
-  height: 8px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #ffffff 0%, #d4d6db 40%, #9c9ea6 72%, #e9eaed 100%);
-  box-shadow: 0 7px 12px -5px rgb(110 20 35 / 0.4);
-}
-/* no desktop o trilho termina logo depois das peças, sem sobra pela tela
-   (pedido do cliente, nov/2026); no celular ele vai de borda a borda */
-@media (min-width: 1024px) {
-  .arara-trilho {
-    left: -0.75rem;
-    right: -0.75rem;
+@media (min-width: 1280px) {
+  .topo-banners-faixa {
+    left: 50%;
+    right: auto;
+    width: 100%;
+    max-width: 1920px;
+    transform: translateX(-50%);
+  }
+  .topo-banners-veu {
+    background: linear-gradient(
+      90deg,
+      rgb(253 241 243 / 0.92) 0%,
+      rgb(253 241 243 / 0.82) 30%,
+      rgb(253 241 243 / 0.4) 44%,
+      transparent 56%
+    );
   }
 }
-.arara-vagas {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: start;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.arara-vaga {
-  display: flex;
-  justify-content: center;
-}
-.arara-peca {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: var(--larg, 80%);
-  perspective: 900px;
-  cursor: grab;
-  touch-action: pan-y;
-  -webkit-tap-highlight-color: transparent;
-  border-radius: 14px;
-  outline: none;
-}
-.arara-peca:active {
-  cursor: grabbing;
-}
-.arara-peca:focus-visible {
-  outline: 2px solid #e63946;
-  outline-offset: 6px;
-}
-.arara-balanco {
-  display: block;
-  width: 100%;
-  transform-origin: 50% 0;
-  transform: rotate(var(--balanco, 0deg));
-  transform-style: preserve-3d;
-}
-.arara-giro {
-  position: relative;
-  display: block;
-  width: 100%;
-  padding-top: var(--gancho);
-  transform: rotateY(var(--giro, 0deg));
-  transform-style: preserve-3d;
-}
-.arara-giro-presilha {
-  padding-top: calc(var(--gancho) + 12px);
-}
-.arara-gancho {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 22px;
-  height: calc(var(--gancho) + 1px);
-  transform: translateX(-50%);
-  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25));
-}
-.arara-cabide {
-  position: absolute;
-  top: calc(var(--gancho) - 3px);
-  left: 50%;
-  width: 66%;
-  height: 8px;
-  border-radius: 999px;
-  transform: translateX(-50%);
-  background: linear-gradient(180deg, #e9c99f 0%, #c99a64 55%, #a8784a 100%);
-  box-shadow: 0 2px 3px -1px rgb(70 30 10 / 0.35);
-}
-/* prendedores: duas presilhas cromadas descem do cabide até o cós */
-.arara-cabide-presilha::before,
-.arara-cabide-presilha::after {
-  content: "";
-  position: absolute;
-  top: 6px;
-  width: 6px;
-  height: 18px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, #8d8f96, #eef0f3 50%, #7a7c83);
-}
-.arara-cabide-presilha::before {
-  left: 8%;
-}
-.arara-cabide-presilha::after {
-  right: 8%;
-}
-.arara-camadas {
-  position: relative;
-  display: block;
-  width: 100%;
-  transform-style: preserve-3d;
-}
-.arara-camada {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-.arara-frente {
-  backface-visibility: hidden;
-}
-/* o miolo é a espessura: só aparece quando a peça está de lado */
-.arara-miolo {
-  filter: brightness(0.42) saturate(0.8);
-}
-/* de costas: a silhueta espelhada, um tom abaixo — lê como avesso */
-.arara-costas {
-  filter: brightness(0.84) saturate(0.9);
-}
-.arara-luz {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  backface-visibility: hidden;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  background:
-    linear-gradient(100deg, transparent 38%, rgb(255 255 255 / 0.3) 50%, transparent 62%)
-      var(--luz, 0%) 0 / 260% 100% no-repeat,
-    rgb(45 0 14 / calc(var(--escuro, 0) * 0.5));
-}
-.arara-etiqueta {
-  position: absolute;
-  top: calc(var(--gancho) + 6px);
-  left: 58%;
-  padding: 3px 7px 3px 12px;
-  border-radius: 5px;
-  background: #1d1b1e;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1.3;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  rotate: 7deg;
-  backface-visibility: hidden;
-  box-shadow: 0 5px 12px -3px rgb(0 0 0 / 0.35);
-  pointer-events: none;
-}
-/* o furo da etiqueta */
-.arara-etiqueta::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 4px;
-  width: 4px;
-  height: 4px;
-  margin-top: -2px;
-  border-radius: 50%;
-  background: #8a878c;
-}
-.arara-giro-presilha .arara-etiqueta {
-  top: calc(var(--gancho) + 22px);
-}
-.arara-chao {
-  display: block;
-  width: 72%;
-  height: 14px;
-  margin-top: 12px;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, rgb(120 20 35 / 0.26), transparent);
-  transform: scaleX(var(--chao, 1));
-}
-.arara-dica {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--color-suave);
-}
-.arara-dica-toque {
-  display: none;
-}
-@media (pointer: coarse) {
-  .arara-dica-mouse {
-    display: none;
-  }
-  .arara-dica-toque {
-    display: inline;
-  }
-}
-/* notebook estreito (1024–1279px): a coluna da arara é a mais apertada de
-   todas e as etiquetas no tamanho cheio encostavam na peça vizinha */
-@media (min-width: 1024px) and (max-width: 1279px) {
-  .arara-etiqueta {
-    font-size: 8.5px;
-    padding: 2px 5px 2px 10px;
-  }
-}
-@media (max-width: 639px) {
-  .arara {
-    --gancho: 34px;
-  }
-  /* na vaga estreita do celular a etiqueta cobriria a peça ou vazaria da
-     tela; a marca e a referência continuam no nome lido pelo leitor */
-  .arara-etiqueta {
-    display: none;
+@media (min-width: 1921px) {
+  .topo-banners-faixa {
+    -webkit-mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
+    mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
   }
 }

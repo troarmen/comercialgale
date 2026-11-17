@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import { urlFoto } from "@/lib/formato";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { CHAVES_VITRINE, interpretarVitrine, LOGO_PADRAO, MAX_BANNERS } from "@/lib/vitrine";
+import {
+  BANNERS_PADRAO,
+  CHAVES_VITRINE,
+  interpretarVitrine,
+  LOGO_PADRAO,
+  MAX_BANNERS,
+} from "@/lib/vitrine";
 import { EditorBanners, type BannerPainel } from "./banners";
 import { EditorLogo } from "./logo";
 
@@ -60,7 +66,11 @@ export default async function PaginaVitrine() {
       </header>
 
       <div className="flex max-w-5xl flex-col gap-5">
-        <EditorBanners banners={lista} maximo={MAX_BANNERS} />
+        <EditorBanners
+          banners={lista}
+          maximo={MAX_BANNERS}
+          padroes={BANNERS_PADRAO.map((b) => ({ id: b.id, alt: b.alt, src: b.computador.src }))}
+        />
         <EditorLogo
           atual={
             logo

@@ -60,9 +60,12 @@ function ResumoLink({ banner }: { banner: BannerPainel }) {
 export function EditorBanners({
   banners,
   maximo,
+  padroes,
 }: {
   banners: BannerPainel[];
   maximo: number;
+  /** Os banners que a loja mostra enquanto nenhum daqui estiver ativo. */
+  padroes: { id: string; alt: string; src: string }[];
 }) {
   const [editando, setEditando] = useState<string | "novo" | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -90,8 +93,9 @@ export function EditorBanners({
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-suave">
             De 1 a {maximo} banners, passando um depois do outro a cada 6
             segundos. Cada um pode levar a uma página do site, a um produto ou a
-            outro site. Sem nenhum banner ativo, a loja mostra o topo de sempre
-            (o texto de boas-vindas com as fotos).
+            outro site. O título da loja e os botões ficam sempre por cima, em
+            texto: o banner é a arte em volta deles. Sem nenhum banner ativo, a
+            loja mostra os {padroes.length} banners padrão (veja abaixo).
           </p>
         </div>
         <button
@@ -112,19 +116,24 @@ export function EditorBanners({
         <div>
           <dt className="font-medium text-texto">Imagem para computador · obrigatória</dt>
           <dd className="mt-0.5 text-suave">
-            {MEDIDAS.computador.rotulo}. Imagem em outra proporção é recortada
-            pelo centro.
+            {MEDIDAS.computador.rotulo}. Em tela larga ela vira o fundo do
+            topo e o título fica por cima da <strong className="font-semibold text-texto">metade
+            esquerda</strong>: deixe esse lado só com fundo e ponha produtos e
+            textos na metade direita. Imagem em outra proporção é recortada pelo
+            centro.
           </dd>
         </div>
         <div>
           <dt className="font-medium text-texto">Imagem para celular · opcional</dt>
           <dd className="mt-0.5 text-suave">
-            {MEDIDAS.celular.rotulo}. Sem ela, o celular mostra a do computador,
-            mais baixa e com letra pequena.
+            {MEDIDAS.celular.rotulo}. Aparece embaixo do título no celular e ao
+            lado dele em notebook pequeno. Sem ela, entra um recorte quadrado
+            do lado direito da imagem de computador.
           </dd>
         </div>
         <p className="text-xs text-tenue sm:col-span-2">
-          Deixe textos e rostos longe das bordas. JPG, PNG ou WebP — a imagem é
+          Deixe textos e rostos longe das bordas (em tela larga, uns 70 px de
+          cima e de baixo podem ser cortados). JPG, PNG ou WebP — a imagem é
           reduzida e convertida aqui mesmo antes de subir.
         </p>
       </dl>
@@ -132,9 +141,9 @@ export function EditorBanners({
       {celularMisturado && (
         <p className="mt-3 rounded-lg bg-alerta-fundo px-3.5 py-2.5 text-sm text-alerta-texto">
           {comCelular} de {ativos.length} banners ativos têm imagem para celular.
-          No celular, os que não têm aparecem menores, com faixas brancas em
-          cima e embaixo. Para ficar uniforme, envie a imagem de celular em
-          todos (ou em nenhum).
+          No celular, os que não têm mostram só um recorte do lado direito da
+          imagem de computador. Para ficar uniforme, envie a imagem de celular
+          em todos.
         </p>
       )}
 
@@ -152,7 +161,7 @@ export function EditorBanners({
 
       {banners.length === 0 && editando !== "novo" ? (
         <p className="mt-4 rounded-lg border border-dashed border-borda px-4 py-8 text-center text-sm text-suave">
-          Nenhum banner cadastrado — a loja está com o topo padrão.
+          Nenhum banner cadastrado — a loja está com os banners padrão.
         </p>
       ) : (
         <ol className="mt-4 flex flex-col gap-3">
@@ -255,6 +264,31 @@ export function EditorBanners({
           )}
         </ol>
       )}
+
+      <div className="mt-5 border-t border-borda pt-4">
+        <h3 className="text-sm font-medium text-texto">
+          Banners padrão{" "}
+          <span
+            className={`ml-1 rounded-full px-2 py-0.5 align-middle text-xs font-medium ${
+              ativos.length === 0 ? "bg-acento/10 text-acento-texto" : "bg-superficie-2 text-suave"
+            }`}
+          >
+            {ativos.length === 0 ? "no ar agora" : "guardados"}
+          </span>
+        </h3>
+        <p className="mt-1 max-w-2xl text-sm text-suave">
+          Entram sozinhos sempre que nenhum banner acima estiver ativo, para o
+          topo da loja nunca ficar vazio. Não dá para apagá-los — basta ter
+          pelo menos um banner seu ativo.
+        </p>
+        <ul className="mt-3 flex flex-wrap gap-3">
+          {padroes.map((p) => (
+            <li key={p.id} className="relative aspect-[3/1] w-56 overflow-hidden rounded-lg bg-superficie-2 ring-1 ring-borda">
+              <Image src={p.src} alt={p.alt} fill sizes="224px" className="object-cover" />
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }
@@ -283,6 +317,7 @@ function CampoImagem({
   removivel,
   removida,
   aoRemover,
+  areaTitulo,
 }: {
   id: string;
   rotulo: string;
@@ -296,6 +331,8 @@ function CampoImagem({
   removivel?: boolean;
   removida?: boolean;
   aoRemover?: (remover: boolean) => void;
+  /** Marca na prévia a metade esquerda, onde o título da loja fica por cima. */
+  areaTitulo?: boolean;
 }) {
   const entrada = useRef<HTMLInputElement>(null);
   const previa = preparada?.previa ?? (removida ? null : atual);
@@ -312,6 +349,16 @@ function CampoImagem({
           <Image src={previa} alt="" fill sizes="480px" unoptimized className="object-cover" />
         ) : (
           <span className="px-3 text-center text-xs text-tenue">{dica}</span>
+        )}
+        {areaTitulo && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-0 flex w-1/2 items-start border-r border-dashed border-acento/60 bg-acento/5 p-1.5"
+          >
+            <span className="rounded bg-white/85 px-1.5 py-0.5 text-[10px] font-medium text-acento-texto">
+              área do título
+            </span>
+          </span>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -493,6 +540,7 @@ function FormBanner({
           atual={banner?.urlComputador ?? null}
           preparada={computador}
           proporcao="aspect-[3/1]"
+          areaTitulo
           aoEscolher={(f) => preparar(f, MEDIDAS.computador, setComputador)}
           aoLimpar={() => setComputador(null)}
         />

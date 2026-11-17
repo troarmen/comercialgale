@@ -86,7 +86,8 @@ Notas que economizam tempo:
   `cadastro_aprovacao_automatica` (ausente = ligada; erro de leitura =
   desligada) em `src/app/(catalogo)/cadastro/servidor.ts`, e `vitrine_banners`
   / `vitrine_logo` (tela Vitrine; arquivos no bucket `produtos` sob `vitrine/`)
-  em `src/lib/vitrine.ts`.
+  em `src/lib/vitrine.ts`. Sem banner ativo, a home usa os banners padrão de
+  `public/banners/` (`BANNERS_PADRAO`) — nada a criar no banco.
 
 ---
 

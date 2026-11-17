@@ -32,7 +32,7 @@ import { criarClienteAdmin, criarClienteServidor } from "@/lib/supabase/server";
  *     navegador. Componente cliente importa daqui apenas TIPOS.
  *
  * Qualquer falha (chave ausente, JSON torto, banco fora do ar, variável de
- * ambiente faltando) devolve o padrão: sem banner (o topo de sempre) e o logo
+ * ambiente faltando) devolve o padrão: os banners de BANNERS_PADRAO e o logo
  * de /public. A loja nunca quebra por causa da vitrine.
  */
 
@@ -79,6 +79,29 @@ export type BannerLoja = {
 };
 
 export type LogoLoja = ImagemLoja & { alt: string; padrao: boolean };
+
+/**
+ * Banners padrão do topo, em /public/banners — valem enquanto o painel não
+ * tiver nenhum banner ATIVO (assim o topo nunca fica vazio, e o h1 sempre
+ * tem arte atrás). Genéricos de propósito, um por categoria, sem promoção
+ * (pedido do cliente, nov/2026). São gerados de design/banners-padrao/.
+ */
+export const BANNERS_PADRAO: BannerLoja[] = [
+  {
+    id: "padrao-lingerie",
+    alt: "Lingerie no atacado: tangas e top pendurados numa arara. Ver a categoria Lingerie.",
+    computador: { src: "/banners/padrao-lingerie-computador.webp", largura: 1920, altura: 640 },
+    celular: { src: "/banners/padrao-lingerie-celular.webp", largura: 1080, altura: 1080 },
+    link: { href: "/produtos/lingerie", externo: false },
+  },
+  {
+    id: "padrao-cuecas",
+    alt: "Cuecas no atacado: três cuecas boxer penduradas numa arara. Ver a categoria Cuecas.",
+    computador: { src: "/banners/padrao-cuecas-computador.webp", largura: 1920, altura: 640 },
+    celular: { src: "/banners/padrao-cuecas-celular.webp", largura: 1080, altura: 1080 },
+    link: { href: "/produtos/cuecas", externo: false },
+  },
+];
 
 /** O logo de sempre, em /public — vale quando não há logo configurado. */
 export const LOGO_PADRAO: LogoLoja = {
@@ -248,7 +271,8 @@ function imagemLoja(i: ImagemVitrine): ImagemLoja {
 }
 
 /**
- * Banners ativos, na ordem do painel. O link de produto é resolvido agora,
+ * Banners ativos, na ordem do painel — ou os padrão, se não houver nenhum
+ * ativo. O link de produto é resolvido agora,
  * pelo ID, com o cliente PÚBLICO (o RLS só devolve produto ativo): produto
  * renomeado leva ao slug novo; produto desativado deixa o banner sem link
  * em vez de mandar o lojista para um 404.
@@ -256,7 +280,7 @@ function imagemLoja(i: ImagemVitrine): ImagemLoja {
 export const bannersDaLoja = cache(async (): Promise<BannerLoja[]> => {
   const { banners } = await vitrineGuardada();
   const ativos = banners.filter((b) => b.ativo);
-  if (!ativos.length) return [];
+  if (!ativos.length) return BANNERS_PADRAO;
 
   const idsProduto = ativos.flatMap((b) =>
     b.link?.tipo === "produto" ? [b.link.produtoId] : [],

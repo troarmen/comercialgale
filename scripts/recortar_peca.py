@@ -1,9 +1,10 @@
 """
 Recorta o fundo branco de estúdio de uma foto de produto e grava um WebP com
-transparência — as peças da arara 3D do topo da home (public/arara/).
+transparência — as peças penduradas dos banners padrão do topo da home
+(design/banners-padrao/pecas/; ver design/banners-padrao/banner.html).
 
 Uso:
-    python3 scripts/recortar_arara.py <url-ou-arquivo> public/arara/<nome>.webp \
+    python3 scripts/recortar_peca.py <url-ou-arquivo> design/banners-padrao/pecas/<nome>.webp \
         [--apagar x0,y0,x1,y1] [--buracos 1500]
 
 Como funciona: o branco ligado à borda da foto vira transparente (preenchimento
@@ -15,6 +16,10 @@ fica. Duas opções para fotos teimosas:
   --buracos  área mínima de branco FECHADO pela peça que também vira fundo
              (o vão entre a alça e o bojo). Não use em peça com etiqueta
              branca grande, ela sumiria junto.
+  --limiar   quão claro um pixel precisa ser para contar como fundo (padrão
+             226; baixe para ~200 quando a foto tem sombra cinza em volta).
+  --erosao   quantos pixels a borda da peça encolhe (padrão 3, ímpar); suba
+             para 5 quando sobrar um contorno claro.
 Depois de gerar, confira sobre fundo colorido: recorte ruim aparece como
 borda branca.
 
@@ -35,10 +40,10 @@ def abrir(origem: str) -> Image.Image:
     return Image.open(origem)
 
 
-def recortar(im: Image.Image, apagar=None, buracos=0, lado=600) -> Image.Image:
+def recortar(im: Image.Image, apagar=None, buracos=0, lado=600, limiar=226, erosao=3) -> Image.Image:
     a = np.asarray(im.convert("RGB")).astype(np.int16)
     mn, mx = a.min(2), a.max(2)
-    fundo = (mn > 226) & ((mx - mn) < 20)  # quase branco e sem cor
+    fundo = (mn > limiar) & ((mx - mn) < 20)  # quase branco e sem cor
     if apagar:
         x0, y0, x1, y1 = apagar
         regiao = np.zeros_like(fundo)
@@ -65,7 +70,7 @@ def recortar(im: Image.Image, apagar=None, buracos=0, lado=600) -> Image.Image:
             ImageDraw.floodfill(m, p, 128 if n > buracos else 50)
 
     alfa = Image.fromarray(np.where(np.asarray(m) == 128, 0, 255).astype(np.uint8))
-    alfa = alfa.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.9))
+    alfa = alfa.filter(ImageFilter.MinFilter(erosao)).filter(ImageFilter.GaussianBlur(0.9))
     al = np.asarray(alfa).astype(np.float32) / 255
 
     # tira o halo branco da borda suavizada
@@ -86,8 +91,10 @@ def main():
     ap.add_argument("destino")
     ap.add_argument("--apagar", type=lambda s: tuple(int(v) for v in s.split(",")))
     ap.add_argument("--buracos", type=int, default=0)
+    ap.add_argument("--limiar", type=int, default=226)
+    ap.add_argument("--erosao", type=int, default=3)
     args = ap.parse_args()
-    out = recortar(abrir(args.origem), args.apagar, args.buracos)
+    out = recortar(abrir(args.origem), args.apagar, args.buracos, limiar=args.limiar, erosao=args.erosao)
     out.save(args.destino, "WEBP", quality=80, method=6)
     print(args.destino, out.size)
 

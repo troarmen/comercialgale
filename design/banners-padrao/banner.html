@@ -1,0 +1,229 @@
+<!doctype html>
+<!--
+  Molde dos banners padrão do topo da home (nov/2026). Abra no navegador com
+  ?b=lingerie|cuecas&f=computador|celular e fotografe a página no tamanho
+  exato (1920×640 ou 1080×1080) — é o que design/banners-padrao/gerar.mjs faz.
+
+  Regra de composição do banner de COMPUTADOR, a mesma que o painel pede ao
+  cliente: a metade esquerda fica livre (o h1 da home é texto de verdade e
+  fica por cima dela) e a arte mora entre 55% e 97% da largura, longe 60 px
+  das bordas de cima e de baixo (o topo corta ~70 px de cada lado em telas
+  de 1920 px ou mais).
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=block" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: var(--w); height: var(--h); overflow: hidden; }
+  body {
+    position: relative;
+    font-family: Inter, system-ui, sans-serif;
+    background-color: #fcecee;
+  }
+  /* o mesmo fundo do topo da loja (.fundo-hero), sem a área do texto */
+  .computador body, body.computador {
+    background-image:
+      radial-gradient(40% 75% at 74% 52%, rgb(255 250 251 / 0.95), transparent 72%),
+      radial-gradient(55% 110% at 100% 0%, color-mix(in srgb, #e63946 24%, transparent), transparent 70%),
+      radial-gradient(50% 95% at 0% 100%, color-mix(in srgb, #f27484 26%, transparent), transparent 70%),
+      linear-gradient(180deg, #fdf1f3 0%, #f8dbe0 100%);
+  }
+  body.celular {
+    background-image:
+      radial-gradient(70% 55% at 50% 55%, rgb(255 250 251 / 0.95), transparent 72%),
+      radial-gradient(70% 60% at 100% 0%, color-mix(in srgb, #e63946 22%, transparent), transparent 70%),
+      radial-gradient(70% 60% at 0% 100%, color-mix(in srgb, #f27484 24%, transparent), transparent 70%),
+      linear-gradient(180deg, #fdf1f3 0%, #f8dbe0 100%);
+  }
+  .trilho {
+    position: absolute;
+    height: var(--trilho-alt);
+    border-radius: 999px;
+    background: linear-gradient(180deg, #ffffff 0%, #d4d6db 40%, #9c9ea6 72%, #e9eaed 100%);
+    box-shadow: 0 12px 20px -8px rgb(110 20 35 / 0.38);
+  }
+  .trilho::before, .trilho::after {
+    /* ponteiras do trilho */
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: calc(var(--trilho-alt) * 1.6);
+    height: calc(var(--trilho-alt) * 1.6);
+    border-radius: 50%;
+    transform: translateY(-50%);
+    background: radial-gradient(circle at 35% 35%, #ffffff, #b9bbc2 60%, #8d8f96);
+    box-shadow: 0 4px 8px -2px rgb(80 20 30 / 0.35);
+  }
+  .trilho::before { left: calc(var(--trilho-alt) * -0.4); }
+  .trilho::after { right: calc(var(--trilho-alt) * -0.4); }
+  .peca {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform-origin: 50% 0;
+  }
+  .gancho { display: block; }
+  .corpo { position: relative; width: 100%; }
+  .corpo img {
+    display: block;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 18px 22px rgb(90 15 30 / 0.16)) drop-shadow(0 3px 5px rgb(60 10 20 / 0.12));
+  }
+  .cabide {
+    position: absolute;
+    left: 50%;
+    width: 70%;
+    border-radius: 999px;
+    transform: translateX(-50%);
+    background: linear-gradient(180deg, #e9c99f 0%, #c99a64 55%, #a8784a 100%);
+    box-shadow: 0 3px 5px -1px rgb(70 30 10 / 0.35);
+  }
+  .presilha {
+    position: absolute;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #8d8f96, #eef0f3 50%, #7a7c83);
+    box-shadow: 0 2px 3px rgb(0 0 0 / 0.18);
+  }
+  .chao {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgb(120 20 35 / 0.24), transparent);
+  }
+  .selo {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7em;
+    padding: 0.62em 1.1em 0.62em 0.95em;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #1d1b1e;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    box-shadow: 0 10px 24px -10px rgb(110 20 35 / 0.45), 0 0 0 1px rgb(29 27 30 / 0.06);
+  }
+  .selo i {
+    width: 0.55em;
+    height: 0.55em;
+    border-radius: 50%;
+    background: #e63946;
+  }
+  .selo span { color: #c81e33; font-weight: 600; }
+</style>
+</head>
+<body>
+<script>
+  // ------------------------------------------------------------ composições
+  // x = centro da peça e topo do gancho em px; larg = largura da peça.
+  const BANNERS = {
+    lingerie: {
+      selo: ["Lingerie", "Ver categoria →"],
+      pecas: [
+        { img: "tanga-7473.webp", cabide: "presilha", giro: -2 },
+        { img: "sutia-9189.webp", cabide: "alca", giro: 1 },
+        { img: "tanga-7475.webp", cabide: "presilha", giro: 2.5 },
+      ],
+      larguras: [1, 0.96, 1],
+    },
+    cuecas: {
+      selo: ["Cuecas", "Ver categoria →"],
+      pecas: [
+        { img: "boxer-8520.webp", cabide: "presilha", giro: -2 },
+        { img: "boxer-sc63.webp", cabide: "presilha", giro: 1 },
+        { img: "boxer-bma.webp", cabide: "presilha", giro: 2.5 },
+      ],
+      larguras: [0.9, 0.86, 0.9],
+    },
+  };
+
+  const q = new URLSearchParams(location.search);
+  const banner = BANNERS[q.get("b") || "lingerie"];
+  const formato = q.get("f") || "computador";
+  document.body.className = formato;
+
+  // Geometria por formato. Computador: arte entre 55% e 97% da largura.
+  const G = formato === "computador"
+    ? { w: 1920, h: 640, trilho: [1030, 1880], trilhoY: 108, trilhoAlt: 12,
+        centros: [1186, 1458, 1730], larg: 268, gancho: 56, selo: [1050, 490], fonte: 21 }
+    : { w: 1080, h: 1080, trilho: [44, 1036], trilhoY: 176, trilhoAlt: 15,
+        centros: [200, 540, 880], larg: 336, gancho: 74, selo: [60, 760], fonte: 32 };
+
+  document.documentElement.style.setProperty("--w", G.w + "px");
+  document.documentElement.style.setProperty("--h", G.h + "px");
+  document.documentElement.style.setProperty("--trilho-alt", G.trilhoAlt + "px");
+
+  const trilho = document.createElement("div");
+  trilho.className = "trilho";
+  Object.assign(trilho.style, {
+    left: G.trilho[0] + "px",
+    width: G.trilho[1] - G.trilho[0] + "px",
+    top: G.trilhoY + "px",
+  });
+  document.body.append(trilho);
+
+  const gancho = (alt) => `
+    <svg class="gancho" width="${alt * 0.6}" height="${alt}" viewBox="0 0 28 48" fill="none">
+      <defs><linearGradient id="c" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#8d8f96"/><stop offset=".45" stop-color="#f4f5f7"/><stop offset="1" stop-color="#7a7c83"/>
+      </linearGradient></defs>
+      <path d="M14 47V30c0-3.5-2.6-5.5-6.2-7.2C4.6 21.2 3 18.8 3 15.5 3 10.2 7.6 6 13.5 6 19.4 6 24 10 24 15"
+        stroke="url(#c)" stroke-width="2.8" stroke-linecap="round"/>
+    </svg>`;
+
+  banner.pecas.forEach((p, i) => {
+    const larg = G.larg * banner.larguras[i];
+    const el = document.createElement("div");
+    el.className = "peca";
+    // o laço do gancho abraça o trilho
+    const topo = G.trilhoY - G.gancho * 0.2;
+    Object.assign(el.style, {
+      left: G.centros[i] - larg / 2 + "px",
+      top: topo + "px",
+      width: larg + "px",
+      transform: `rotate(${p.giro}deg)`,
+    });
+    const barra = Math.round(G.gancho * 0.17);
+    const folga = p.cabide === "presilha" ? Math.round(G.gancho * 0.34) : 0;
+    el.innerHTML = `
+      ${gancho(G.gancho)}
+      <div class="corpo" style="margin-top:${folga - barra * 0.4}px">
+        <span class="cabide" style="top:${-folga - barra * 0.6}px;height:${barra}px"></span>
+        ${p.cabide === "presilha" ? `
+          <span class="presilha" style="left:16%;top:${-folga}px;width:${barra * 0.8}px;height:${folga + barra * 1.2}px"></span>
+          <span class="presilha" style="right:16%;top:${-folga}px;width:${barra * 0.8}px;height:${folga + barra * 1.2}px"></span>` : ""}
+        <img src="pecas/${p.img}" alt="" />
+      </div>`;
+    document.body.append(el);
+  });
+
+  // sombra no chão, embaixo de cada peça, depois que as imagens têm altura
+  window.prontas = Promise.all([...document.images].map((im) => im.decode())).then(() => {
+    document.querySelectorAll(".peca").forEach((el) => {
+      const r = el.getBoundingClientRect();
+      const s = document.createElement("div");
+      s.className = "chao";
+      Object.assign(s.style, {
+        left: r.left + r.width * 0.12 + "px",
+        top: r.bottom + G.h * 0.015 + "px",
+        width: r.width * 0.76 + "px",
+        height: G.h * 0.03 + "px",
+      });
+      document.body.append(s);
+    });
+    const selo = document.createElement("div");
+    selo.className = "selo";
+    selo.style.left = G.selo[0] + "px";
+    selo.style.top = G.selo[1] + "px";
+    selo.style.fontSize = G.fonte + "px";
+    selo.innerHTML = `<i></i>${banner.selo[0]}<span>${banner.selo[1]}</span>`;
+    document.body.append(selo);
+    return document.fonts.ready;
+  });
+</script>
+</body>
+</html>
