@@ -5,7 +5,7 @@ para arquivos JSON locais, prontos para importar no Supabase.
 
 SOMENTE LEITURA. O único POST que não é consulta é o de login.
 
-Uso:
+Uso (LEGADO_BASE, LEGADO_LOGIN e LEGADO_SENHA no ambiente):
     python3 scripts/extrair_legado.py            # extrai tudo (retoma de onde parou)
     python3 scripts/extrair_legado.py produtos   # só um módulo
 
@@ -26,9 +26,13 @@ from urllib.parse import quote
 
 import requests
 
-BASE = "https://comercialgale.com.br"
-LOGIN = "admin"
-SENHA = "Arthur2303"
+# Endereço e login do painel antigo só pelo ambiente — nada de senha no
+# repositório (público). comercialgale.com.br hoje é o site novo: LEGADO_BASE
+# precisa apontar para onde o painel antigo ainda responde.
+# O recuperar_negrito.py importa este módulo e sobrescreve as três.
+BASE = os.environ.get("LEGADO_BASE", "").rstrip("/")
+LOGIN = os.environ.get("LEGADO_LOGIN", "").strip()
+SENHA = os.environ.get("LEGADO_SENHA", "")
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SAIDA = os.path.join(RAIZ, "db", "migracao", "legado")
@@ -51,6 +55,11 @@ class Painel:
     """Sessão autenticada no painel antigo, com relogin automático."""
 
     def __init__(self):
+        if not BASE or not LOGIN or not SENHA:
+            raise SystemExit(
+                "Informe LEGADO_BASE, LEGADO_LOGIN e LEGADO_SENHA no ambiente "
+                "(endereço e login do painel antigo)."
+            )
         self.s = requests.Session()
         self.s.headers.update({
             "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36",

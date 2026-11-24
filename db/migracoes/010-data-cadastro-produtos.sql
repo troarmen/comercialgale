@@ -3,7 +3,7 @@
 --
 -- POR QUÊ: a lista de produtos do painel ganhou a coluna "Cadastro" (pedido
 -- do cliente, nov/2026), lida de `produtos.created_at`. Só que `created_at`
--- marca quando a linha entrou NESTE banco: na importação os 556 produtos
+-- marca quando a linha entrou NESTE banco: na importação os 573 produtos
 -- ficaram todos com o mesmo dia de agosto de 2026, e a coluna diria isso de
 -- todos. O sistema antigo tem a data verdadeira de cada produto; esta
 -- migração a traz, casando por `legado_id`. Produto criado pelo painel (sem
@@ -13,8 +13,8 @@
 -- muda de dia em nenhum fuso em que o painel ou o catálogo a exibam.
 --
 -- `updated_at` é preservado: o gatilho t_produtos o poria em now() em todos
--- os 556, e o sitemap usa `updated_at` como `lastmod` — o Google
--- receberia "556 páginas mudaram hoje" sem nada ter mudado. Por isso o
+-- os 573, e o sitemap usa `updated_at` como `lastmod` — o Google
+-- receberia "573 páginas mudaram hoje" sem nada ter mudado. Por isso o
 -- gatilho fica desligado só durante o UPDATE (DISABLE TRIGGER é
 -- transacional: se algo falhar, o rollback o religa junto).
 --
@@ -640,7 +640,24 @@ insert into _010_datas (legado_id, data) values
   (2711, '2026-06-15'),
   (2712, '2026-06-15'),
   (2713, '2026-07-08'),
-  (2714, '2026-08-11')
+  (2714, '2026-08-11'),
+  (2715, '2026-08-27'),
+  (2716, '2026-10-13'),
+  (2717, '2026-10-26'),
+  (2718, '2026-10-26'),
+  (2719, '2026-10-26'),
+  (2720, '2026-10-26'),
+  (2721, '2026-10-26'),
+  (2722, '2026-10-26'),
+  (2723, '2026-11-09'),
+  (2724, '2026-11-09'),
+  (2725, '2026-11-09'),
+  (2726, '2026-11-09'),
+  (2727, '2026-11-09'),
+  (2728, '2026-11-09'),
+  (2729, '2026-11-09'),
+  (2730, '2026-11-09'),
+  (2731, '2026-11-09')
 ;
 
 -- Guarda o valor de antes só de quem vai mudar. `do nothing`: se a migração
@@ -682,7 +699,7 @@ commit;
 --   select extract(year from created_at at time zone 'America/Sao_Paulo') as ano,
 --          count(*)
 --     from public.produtos where legado_id is not null group by 1 order by 1;
---   -- esperado: 2017=172, 2018=18, 2019=21, 2020=25, 2021=28, 2022=46, 2023=42, 2024=42, 2025=116, 2026=46
+--   -- esperado: 2017=172, 2018=18, 2019=21, 2020=25, 2021=28, 2022=46, 2023=42, 2024=42, 2025=116, 2026=63
 --   select count(*) from public.clientes where cadastrado_em is null;  -- 0
 --   select count(*) from public._backup_010_produtos_created_at;
---   -- na primeira rodada: os produtos cuja data mudou (até 556)
+--   -- na primeira rodada: os produtos cuja data mudou (até 573)
