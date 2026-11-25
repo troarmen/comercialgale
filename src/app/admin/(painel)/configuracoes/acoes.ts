@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { enviarEmailDeTeste } from "@/lib/email";
 import { exigirAdmin, SEM_PERMISSAO } from "@/lib/sessao";
 
 export type EstadoConfig = { ok?: boolean; erro?: string };
@@ -93,4 +94,14 @@ export async function salvarConfiguracoes(
 
   revalidatePath("/admin/configuracoes");
   return { ok: true };
+}
+
+/** Manda um e-mail de teste para o login de quem clicou. */
+export async function testarEmail(): Promise<{ ok: true; para: string } | { erro: string }> {
+  const sessao = await exigirAdmin();
+  if (!sessao) return { erro: SEM_PERMISSAO };
+  const para = sessao.user.email;
+  if (!para) return { erro: "O seu login não tem e-mail." };
+  const r = await enviarEmailDeTeste(para);
+  return "ok" in r ? { ok: true, para } : r;
 }

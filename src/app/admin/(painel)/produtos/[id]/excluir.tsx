@@ -17,15 +17,16 @@ export function ExcluirProduto({
     <div className="text-right">
       <button
         type="button"
-        disabled={pendente || emPedidos > 0}
-        title={
-          emPedidos
-            ? "Aparece em pedidos — desative em vez de excluir"
-            : "Excluir produto"
-        }
+        disabled={pendente}
+        title="Excluir produto"
         onClick={() => {
-          if (!confirm("Excluir este produto e suas fotos? Não dá para desfazer."))
-            return;
+          const aviso = emPedidos
+            ? `Excluir este produto e suas fotos? Não dá para desfazer.\n\n` +
+              `Ele aparece em ${emPedidos} ${emPedidos === 1 ? "pedido" : "pedidos"}: ` +
+              `os pedidos continuam com nome, referência e preços, só perdem o link para a ficha.\n\n` +
+              `Se o produto pode voltar a ser vendido, desative em vez de excluir.`
+            : "Excluir este produto e suas fotos? Não dá para desfazer.";
+          if (!confirm(aviso)) return;
           iniciar(async () => {
             const r = await excluirProduto(id);
             setErro(r?.erro ?? null);

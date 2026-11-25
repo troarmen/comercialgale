@@ -10,6 +10,7 @@ import {
   dataCurta,
   type StatusPedido,
 } from "@/lib/pedidos";
+import { palavrasDaBusca, regexSemAcento } from "@/lib/busca";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { BuscaPedidos } from "./busca";
 
@@ -35,12 +36,38 @@ export default async function PaginaPedidos({
       { count: "exact" },
     );
 
-  if (sp.busca?.trim()) {
-    const termo = sp.busca.trim();
-    // Busca pelo número do pedido. O nome do cliente está em outra tabela e o
-    // PostgREST não filtra por coluna de tabela embutida sem `!inner`, então
-    // resolvemos abaixo com uma consulta separada quando não parece número.
-    consulta = consulta.ilike("numero", `%${termo}%`);
+  /*
+   * Busca por número do pedido OU pelo cliente (relatório do cliente de
+   * 24/11: buscar pelo nome de quem pediu em 11/11 não achava nada — a busca
+   * só olhava o número). Cada palavra precisa aparecer em algum destes:
+   * número, nome/fantasia/e-mail/CPF-CNPJ do cadastro do cliente ou o nome
+   * congelado no pedido (`snapshot_cliente`, que vale mesmo se o cadastro
+   * mudou depois). Sem acento e sem caixa, como a busca de produtos.
+   */
+  for (const palavra of palavrasDaBusca(sp.busca)) {
+    const rx = regexSemAcento(palavra);
+    const digitos = palavra.replace(/\D/g, "");
+    const { data: clientes } = await supabase
+      .from("clientes")
+      .select("id")
+      .or(
+        [
+          `nome.imatch."${rx}"`,
+          `nome_fantasia.imatch."${rx}"`,
+          `email.ilike."*${palavra}*"`,
+          ...(digitos.length >= 3 ? [`documento.like."*${digitos}*"`] : []),
+        ].join(","),
+      )
+      .limit(500);
+    const ids = (clientes ?? []).map((c) => c.id);
+    consulta = consulta.or(
+      [
+        `numero.ilike."*${palavra}*"`,
+        `snapshot_cliente->>nome.imatch."${rx}"`,
+        `snapshot_cliente->>nome_fantasia.imatch."${rx}"`,
+        ...(ids.length ? [`cliente_id.in.(${ids.join(",")})`] : []),
+      ].join(","),
+    );
   }
   if (sp.status && sp.status in STATUS) {
     consulta = consulta.eq("status", sp.status as StatusPedido);

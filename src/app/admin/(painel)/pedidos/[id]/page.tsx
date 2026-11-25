@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { RegistroEmails } from "@/components/registro-emails";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BotaoVoltar } from "@/components/voltar";
@@ -54,6 +55,17 @@ export default async function PaginaPedido({
     .eq("pedido_id", pedido.id)
     .order("produto_titulo")
     .order("tamanho");
+
+  // E-mails deste pedido (só admin lê o log).
+  const { data: emails } = ehAdmin
+    ? await supabase
+        .from("log_atividades")
+        .select("id, acao, created_at, detalhes")
+        .eq("entidade", "pedidos")
+        .eq("entidade_id", String(pedido.id))
+        .in("acao", ["email_enviado", "email_falhou"])
+        .order("created_at")
+    : { data: null };
 
   // Colaborador não lê `clientes`: o join vem null e o snapshot assume.
   const c = clienteDoPedido(pedido.clientes, pedido.snapshot_cliente);
@@ -180,7 +192,7 @@ export default async function PaginaPedido({
                   </tr>
                   <tr className="border-t border-borda">
                     <td colSpan={5} className="px-4 py-2 text-right text-xs text-tenue">
-                      Se revendido pelo preço sugerido
+                      Total no Varejo
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums text-xs text-tenue">
                       {reais(pedido.total_varejo)}
@@ -290,6 +302,13 @@ export default async function PaginaPedido({
               <p className="text-sm text-suave">Cadastro não encontrado.</p>
             )}
           </section>
+
+          {ehAdmin && (
+            <RegistroEmails
+              linhas={emails ?? []}
+              vazio="Nenhum envio registrado. O registro começou em 25/11/2026 — pedidos anteriores não têm."
+            />
+          )}
 
           {ehAdmin && (
             <section className="rounded-xl border border-borda bg-superficie p-4">

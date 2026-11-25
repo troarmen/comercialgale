@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { smtpConfigurado } from "@/lib/email";
 import { FormularioConfiguracoes } from "./formulario";
+import { TesteEmail } from "./teste-email";
 
 export const metadata: Metadata = { title: "Configurações · Galé Comercial" };
 
@@ -46,6 +48,8 @@ export default async function PaginaConfiguracoes() {
         // Ausente = ligada: é o padrão do cadastro (ver cadastro/servidor.ts).
         cadastroAutomatico={comoBooleano(mapa.get("cadastro_aprovacao_automatica"))}
       />
+
+      <TesteEmail configurado={smtpConfigurado()} />
     </div>
   );
 }

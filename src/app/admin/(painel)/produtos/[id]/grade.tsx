@@ -19,6 +19,25 @@ function moeda(v: number | null) {
 }
 
 /**
+ * Lê o que foi digitado como o servidor lê (acoes.ts → `dinheiro`): vírgula
+ * é o decimal e ponto é milhar. Vazio ou inválido = herda o preço do produto.
+ */
+function ler(texto: string): number | null {
+  const t = texto.replace(/[^\d,.]/g, "");
+  if (!t) return null;
+  const n = Number(t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * O campo guarda o TEXTO digitado, não o número. Antes ele era redesenhado
+ * com duas casas a cada tecla ("1" virava "1,00" e o dígito seguinte caía
+ * nos centavos) — relatório do cliente de 24/11. Agora a pessoa digita o
+ * preço como quiser e só ao sair do campo ele é arrumado para "12,50".
+ */
+type LinhaEdicao = { tamanho_id: number; atacado: string; varejo: string };
+
+/**
  * Grade de tamanhos do produto.
  *
  * Preço em branco significa "usa o preço do produto" — que é o caso de 1.387
@@ -36,8 +55,12 @@ export function Grade({
   precoKitAtacado: number;
   pecasNoKit: number;
 }) {
-  const [linhas, setLinhas] = useState<LinhaGrade[]>(
-    inicial.length ? inicial : [],
+  const [linhas, setLinhas] = useState<LinhaEdicao[]>(() =>
+    inicial.map((l) => ({
+      tamanho_id: l.tamanho_id,
+      atacado: moeda(l.preco_atacado),
+      varejo: moeda(l.preco_varejo),
+    })),
   );
 
   const nome = new Map(tamanhos.map((t) => [t.id, t.valor]));
@@ -57,21 +80,26 @@ export function Grade({
 
   function adicionar(id: number) {
     if (!id || usados.has(id)) return;
-    setLinhas((l) => [...l, { tamanho_id: id, preco_atacado: null, preco_varejo: null }]);
+    setLinhas((l) => [...l, { tamanho_id: id, atacado: "", varejo: "" }]);
   }
 
   function remover(id: number) {
     setLinhas((l) => l.filter((x) => x.tamanho_id !== id));
   }
 
-  function mudarPreco(id: number, campo: "preco_atacado" | "preco_varejo", v: string) {
-    const n = v.trim() === "" ? null : Number(v.replace(",", "."));
+  function mudarPreco(id: number, campo: "atacado" | "varejo", v: string) {
+    setLinhas((l) => l.map((x) => (x.tamanho_id === id ? { ...x, [campo]: v } : x)));
+  }
+
+  // Ao sair do campo: valor válido vira "12,50"; inválido fica como está
+  // (o servidor trata como vazio = preço do produto).
+  function arrumar(id: number, campo: "atacado" | "varejo") {
     setLinhas((l) =>
-      l.map((x) =>
-        x.tamanho_id === id
-          ? { ...x, [campo]: Number.isFinite(n as number) ? n : null }
-          : x,
-      ),
+      l.map((x) => {
+        if (x.tamanho_id !== id) return x;
+        const n = ler(x[campo]);
+        return n == null ? x : { ...x, [campo]: moeda(n) };
+      }),
     );
   }
 
@@ -98,7 +126,7 @@ export function Grade({
             </thead>
             <tbody>
               {linhas.map((l) => {
-                const efetivo = l.preco_atacado ?? precoKitAtacado;
+                const efetivo = ler(l.atacado) ?? precoKitAtacado;
                 return (
                   <tr key={l.tamanho_id} className="border-b border-borda last:border-0">
                     <td className="px-3 py-2 font-medium text-texto">
@@ -108,10 +136,9 @@ export function Grade({
                     <td className="px-3 py-2">
                       <input
                         name="tam_atacado"
-                        value={moeda(l.preco_atacado)}
-                        onChange={(e) =>
-                          mudarPreco(l.tamanho_id, "preco_atacado", e.target.value)
-                        }
+                        value={l.atacado}
+                        onChange={(e) => mudarPreco(l.tamanho_id, "atacado", e.target.value)}
+                        onBlur={() => arrumar(l.tamanho_id, "atacado")}
                         inputMode="decimal"
                         placeholder="usa o do produto"
                         className={`${CAMPO} h-9 tabular-nums`}
@@ -120,10 +147,9 @@ export function Grade({
                     <td className="px-3 py-2">
                       <input
                         name="tam_varejo"
-                        value={moeda(l.preco_varejo)}
-                        onChange={(e) =>
-                          mudarPreco(l.tamanho_id, "preco_varejo", e.target.value)
-                        }
+                        value={l.varejo}
+                        onChange={(e) => mudarPreco(l.tamanho_id, "varejo", e.target.value)}
+                        onBlur={() => arrumar(l.tamanho_id, "varejo")}
                         inputMode="decimal"
                         placeholder="usa o do produto"
                         className={`${CAMPO} h-9 tabular-nums`}
@@ -180,7 +206,7 @@ export function Grade({
       {linhas.length > 0 && (
         <p className="mt-3 text-xs text-tenue">
           {linhas.length} {linhas.length === 1 ? "tamanho" : "tamanhos"} ·{" "}
-          {linhas.filter((l) => l.preco_atacado).length} com preço próprio ·
+          {linhas.filter((l) => ler(l.atacado) != null).length} com preço próprio ·
           tipos: {[...new Set(linhas.map((l) => {
             const t = tamanhos.find((x) => x.id === l.tamanho_id);
             return t ? (NOME_TIPO[t.tipo] ?? t.tipo) : "?";

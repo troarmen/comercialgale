@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { BotaoVoltar } from "@/components/voltar";
 import { numero, reais } from "@/lib/formato";
 import { STATUS, dataCurta } from "@/lib/pedidos";
+import { RegistroEmails } from "@/components/registro-emails";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { GerenciarAcesso } from "./acesso";
 import { salvarCliente } from "./acoes";
@@ -31,6 +32,16 @@ export default async function PaginaCliente({
     .maybeSingle();
 
   if (!cliente) notFound();
+
+  // Boas-vindas e convites de senha que o site mandou para este cliente.
+  const { data: emails } = await supabase
+    .from("log_atividades")
+    .select("id, acao, created_at, detalhes")
+    .eq("entidade", "clientes")
+    .eq("entidade_id", String(cliente.id))
+    .in("acao", ["email_enviado", "email_falhou"])
+    .order("created_at", { ascending: false })
+    .limit(10);
 
   const { data: pedidos } = await supabase
     .from("pedidos")
@@ -138,6 +149,11 @@ export default async function PaginaCliente({
               </p>
             )}
           </section>
+
+          <RegistroEmails
+            linhas={emails ?? []}
+            vazio="Nenhum e-mail registrado para este cliente (o registro começou em 25/11/2026)."
+          />
         </aside>
       </div>
     </div>

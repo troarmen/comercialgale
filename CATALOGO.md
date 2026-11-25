@@ -369,3 +369,23 @@ categoria, sem promoção. Pedido nosso: o h1 não muda e continua texto no HTML
   FCP 0,7s, LCP 1,5s (a imagem do banner), CLS 0; sem rolagem lateral de 768 a
   2560px e no iPhone; troca automática, setas e clique na arte conferidos.
 
+## 15. Rodada de alterações do cliente (24/11/2026)
+
+Relatório "Alterações 24.11" (Arthur). O que ficou em cada item:
+
+| # | Pedido | O que foi feito |
+|---|---|---|
+| 1.1 | Datas de cadastro do site antigo | Migração 010 — o Tro rodou em produção em 24/11 (commit `1cccfca`). |
+| 1.2 | Marcação "Lançamento" do antigo | Migração **011** (pendente, roda no SQL Editor): liga os 180 lançamentos do site antigo pela foto de 23/08 — o servidor antigo não responde mais. Só liga, nunca desliga. |
+| 1.3 | Organizar por lançamento no painel | Produtos: coluna "Lançamento" ordenável (marcados primeiro, os mais novos no topo) e atalho **Lançamentos (N)** no cabeçalho; desmarcar pela caixa da linha ou em lote (já existiam). |
+| 2.1 | Ordem "aleatória" nas categorias | Padrão da vitrine: lançamentos → marca → nome → referência, e `id` como desempate em toda ordem (sem ele, empates trocavam de lugar e de página). |
+| 2.2 | Marcas fora de ordem no filtro | Filtro da vitrine em A–Z (`localeCompare` pt-BR); as listas dos filtros do painel também. A home e /marcas seguem por quantidade de produtos. |
+| 3.1 | Preço da variação "enchendo os decimais" | `grade.tsx` guardava número e redesenhava "1,00" a cada tecla; agora guarda o texto e só formata ao sair do campo. |
+| 3.2 | Dom Marco 8747 | Não existe produto ATIVO com essa referência em produção nem na extração do site antigo. Sem acesso ao banco de produção, ficou a consulta de diagnóstico para o Tro (ver relatório da rodada). |
+| 3.3 | Excluir produto descontinuado | O botão existia, mas travava em produto que já foi pedido. Liberado: `pedido_itens` guarda cópia de nome/ref./preços e a FK é `on delete set null` — o pedido mostra o item como "fora do catálogo". |
+| 4.1 | "Varejo — revenda sugerida" e margem | Rótulo "Varejo", sem margem. Textos do site, carrinho, e-mails e Configurações trocados para a definição do cliente (Varejo = compras abaixo do pedido mínimo, ou quem prefere o Varejo). Cálculo de preço não mudou. |
+| 5.1 | E-mail de boas-vindas | Já existia (rodada de 16/11) e sai pelo Brevo; agora fica registrado na ficha do cliente. |
+| 5.2 | Busca de pedidos pelo cliente | Só buscava pelo número. Agora: número, nome/fantasia/e-mail/CPF-CNPJ do cadastro e o nome congelado no pedido, sem acento. |
+| 5.3 | Convite para quem não criou senha | Clientes → **Ainda sem senha** (`/admin/clientes/senhas`): ativos com login que nunca entraram; convite "crie a sua senha no site novo" em lotes de 25 (cota diária do Brevo), sem repetir em 7 dias. |
+| 5.4 | E-mail de pedido que não chegou | Dois defeitos: ia para o e-mail da FICHA (em ficha migrada, velho ou com dois endereços) e a tela dizia "enviamos" mesmo sem enviar. Agora vai para o e-mail do login (+ os da ficha), a tela só promete quando saiu, cada envio fica registrado na ficha do pedido e Configurações tem "Enviar e-mail de teste". |
+

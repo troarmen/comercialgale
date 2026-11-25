@@ -46,6 +46,10 @@ const COLUNAS = {
   categoria: "asc",
   fabricante: "asc",
   cadastro: "desc",
+  // Lançamentos no topo (relatório do cliente de 24/11: "no site antigo
+  // víamos todos os lançamentos no topo e desmarcávamos os que deixaram de
+  // ser novidade"). Dentro dos lançamentos, os cadastrados por último primeiro.
+  lancamento: "desc",
 } satisfies Record<string, Direcao>;
 
 /*
@@ -58,6 +62,12 @@ const DATA = new Intl.DateTimeFormat("pt-BR", {
   month: "2-digit",
   year: "numeric",
 });
+
+function aZ<T extends { nome: string }>(lista: T[] | null): T[] {
+  return [...(lista ?? [])].sort((a, b) =>
+    a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }),
+  );
+}
 
 export default async function PaginaProdutos({
   searchParams,
@@ -72,12 +82,22 @@ export default async function PaginaProdutos({
   const supabase = await criarClienteServidor();
 
   // Listas dos filtros. Vêm juntas porque são pequenas e mudam pouco.
-  const [{ data: categorias }, { data: subcategorias }, { data: fabricantes }] =
-    await Promise.all([
-      supabase.from("categorias").select("id, nome").order("nome"),
-      supabase.from("subcategorias").select("id, nome, categoria_id").order("nome"),
-      supabase.from("fabricantes").select("id, nome").order("nome"),
-    ]);
+  const [
+    { data: categorias },
+    { data: subcategorias },
+    { data: fabricantes },
+    { count: contaLancamentos },
+  ] = await Promise.all([
+    supabase.from("categorias").select("id, nome").order("nome"),
+    supabase.from("subcategorias").select("id, nome, categoria_id").order("nome"),
+    supabase.from("fabricantes").select("id, nome").order("nome"),
+    // número do atalho "Lançamentos (N)" do cabeçalho
+    supabase
+      .from("produtos")
+      .select("id", { count: "exact", head: true })
+      .eq("lancamento", true),
+  ]);
+  const totalLancamentos = contaLancamentos ?? null;
 
   let consulta = supabase
     .from("produtos")
@@ -130,6 +150,12 @@ export default async function PaginaProdutos({
       break;
     case "cadastro":
       consulta = consulta.order("created_at", { ascending: asc });
+      break;
+    case "lancamento":
+      consulta = consulta
+        .order("lancamento", { ascending: asc })
+        .order("created_at", { ascending: false })
+        .order("titulo");
       break;
     default:
       consulta = consulta.order("titulo", { ascending: asc }).order("modelo");
@@ -191,7 +217,8 @@ export default async function PaginaProdutos({
   const titulo = (
     campo: keyof typeof COLUNAS,
     rotulo: string,
-    tipo?: "data",
+    tipo?: "data" | "marca",
+    className = "px-2",
   ) => (
     <CabecalhoOrdenavel
       campo={campo}
@@ -199,7 +226,7 @@ export default async function PaginaProdutos({
       ordem={ordem}
       primeira={COLUNAS[campo]}
       tipo={tipo}
-      className="px-2"
+      className={className}
       caminho="/admin/produtos"
       params={sp}
     />
@@ -222,6 +249,20 @@ export default async function PaginaProdutos({
             {filtrando && " com os filtros aplicados"}
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Atalho do jeito do painel antigo: só os lançamentos, os mais
+              novos no topo, para desmarcar os que deixaram de ser novidade
+              (caixa da linha ou seleção em lote). */}
+          <Link
+            href="/admin/produtos?lancamento=sim&ordem=cadastro&dir=desc"
+            className={`flex h-9 items-center gap-1.5 rounded-lg border px-3.5 text-sm font-medium transition ${
+              sp.lancamento === "sim"
+                ? "border-acento bg-acento/10 text-acento-texto"
+                : "border-borda bg-superficie text-texto hover:bg-superficie-2"
+            }`}
+          >
+            Lançamentos{totalLancamentos !== null && ` (${numero(totalLancamentos)})`}
+          </Link>
         <Link
           href="/admin/produtos/novo"
           className="flex h-9 items-center gap-1.5 rounded-lg bg-acento px-3.5 text-sm font-semibold text-white transition hover:bg-acento-forte"
@@ -231,13 +272,16 @@ export default async function PaginaProdutos({
           </svg>
           Novo produto
         </Link>
+        </div>
       </header>
 
       <div className="mb-4">
+        {/* A–Z em português no próprio servidor: não depende do idioma de
+            ordenação do banco (em "C", acento e minúscula vão para o fim). */}
         <FiltrosProdutos
-          categorias={categorias ?? []}
-          subcategorias={subcategorias ?? []}
-          fabricantes={fabricantes ?? []}
+          categorias={aZ(categorias)}
+          subcategorias={aZ(subcategorias)}
+          fabricantes={aZ(fabricantes)}
         />
       </div>
 
@@ -274,9 +318,7 @@ export default async function PaginaProdutos({
                     {/* O título é bem mais largo que a caixa da coluna: com o hífen
                         opcional, ele quebra em "Lança-/mento" só quando falta
                         espaço (1280 px), em vez de empurrar a tabela. */}
-                    <th scope="col" className="px-1 py-3 text-center font-medium hyphens-manual">
-                      Lança&shy;mento
-                    </th>
+                    {titulo("lancamento", "Lança\u00admento", "marca", "px-1 text-center hyphens-manual")}
                     <th scope="col" className="px-2 py-3 text-center font-medium">Situação</th>
                   </tr>
                 </thead>

@@ -186,7 +186,7 @@ export async function listarProdutos(filtros: FiltrosListagem) {
   if (filtros.lancamentos) consulta = consulta.eq("lancamento", true);
 
   if (filtros.ordem === "recentes") {
-    consulta = consulta.order("created_at", { ascending: false });
+    consulta = consulta.order("created_at", { ascending: false }).order("titulo");
   } else if (filtros.ordem === "nome") {
     // A–Z pela MARCA (pedido do cliente, nov/2026): muitos produtos têm o
     // mesmo nome ("Pijama Infantil"), então o nome sozinho não organiza nada.
@@ -196,11 +196,21 @@ export async function listarProdutos(filtros: FiltrosListagem) {
       .order("titulo")
       .order("modelo");
   } else {
-    // padrão: lançamentos abrem a vitrine, o resto em ordem alfabética
-    consulta = consulta.order("lancamento", { ascending: false }).order("titulo");
+    // Padrão: lançamentos abrem a vitrine e o resto segue MARCA, nome e
+    // referência. Antes era só lançamento + nome — e numa subcategoria como
+    // "Sutiãs Adulto", em que quase tudo se chama "Sutiã Adulto", o banco
+    // devolvia os empates em qualquer ordem (relatório do cliente de 24/11:
+    // "ordem aparentemente aleatória").
+    consulta = consulta
+      .order("lancamento", { ascending: false })
+      .order("fabricantes(nome)", { nullsFirst: false })
+      .order("titulo")
+      .order("modelo");
   }
 
-  const { data, count } = await consulta.range(de, de + porPagina - 1);
+  // Desempate final em todas as ordens: sem ele, produtos empatados podem
+  // trocar de lugar entre uma página e outra (aparecer duas vezes ou sumir).
+  const { data, count } = await consulta.order("id").range(de, de + porPagina - 1);
   const produtos = (data ?? []) as ProdutoResumo[];
 
   return {

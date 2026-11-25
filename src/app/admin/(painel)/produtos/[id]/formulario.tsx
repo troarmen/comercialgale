@@ -98,10 +98,6 @@ export function FormularioProduto({
   };
   const unitAtacado = pecas ? numero(atacado) / pecas : 0;
   const unitVarejo = pecas ? numero(varejo) / pecas : 0;
-  const margem =
-    numero(atacado) > 0 && numero(varejo) > 0
-      ? ((numero(varejo) - numero(atacado)) / numero(atacado)) * 100
-      : null;
 
   const subsVisiveis = listas.subcategorias.filter(
     (s) => s.categoria_id === categoria,
@@ -242,7 +238,7 @@ export function FormularioProduto({
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-texto">
-              Atacado — o que o lojista paga
+              Atacado
             </span>
             <div className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-suave">
@@ -266,7 +262,7 @@ export function FormularioProduto({
 
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-texto">
-              Varejo — revenda sugerida
+              Varejo
             </span>
             <div className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-suave">
@@ -284,7 +280,6 @@ export function FormularioProduto({
             {pecas > 0 && numero(varejo) > 0 && (
               <span className="text-xs text-suave">
                 {reais(unitVarejo)} por peça
-                {margem !== null && ` · margem de ${margem.toFixed(0)}%`}
               </span>
             )}
           </label>

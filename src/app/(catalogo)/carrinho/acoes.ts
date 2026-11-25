@@ -1,7 +1,7 @@
 "use server";
 
 import { configPublica } from "@/lib/catalogo";
-import { emailsDaCasa, enviarEmailsDePedido } from "@/lib/email";
+import { emailsDaCasa, enderecosValidos, enviarEmailsDePedido } from "@/lib/email";
 import { criarClienteAdmin, criarClienteServidor } from "@/lib/supabase/server";
 
 /**
@@ -104,7 +104,12 @@ export async function consultarCarrinho(chaves: ChaveCarrinho[]) {
 export type ItemFechamento = ChaveCarrinho & { qtdKits: number };
 
 export type ResultadoPedido =
-  | { ok: true; numero: string }
+  | {
+      ok: true;
+      numero: string;
+      /** A confirmação saiu? A tela só promete e-mail quando ele saiu. */
+      email: { enviado: boolean; para: string[] };
+    }
   | { ok: false; erro: string };
 
 export async function fecharPedido(
@@ -244,6 +249,8 @@ export async function fecharPedido(
 
   // E-mails: para o cliente e para a casa. Falha de e-mail NÃO desfaz o
   // pedido — por isso tudo daqui para baixo fica dentro do try.
+  const paraCliente = enderecosValidos(user.email, cliente.email);
+  let emailEnviado = false;
   try {
     // Totais como o gatilho recalcular_pedido gravou: é o banco que manda no
     // valor (PAINEL.md §4). A conta local só entra se a releitura falhar.
@@ -259,7 +266,7 @@ export async function fecharPedido(
     const somar = (f: (l: (typeof linhas)[number]) => number) =>
       linhas.reduce((s, l) => s + f(l), 0);
 
-    await enviarEmailsDePedido(
+    const { cliente: confirmacao } = await enviarEmailsDePedido(
       {
         id: pedido.id,
         numero: pedido.numero,
@@ -292,11 +299,12 @@ export async function fecharPedido(
         totalEmbalagens: somar((l) => l.qtd_kits),
       },
       destinosDaCasa,
-      { varejoParaLojista: config.exibirVarejo },
+      { varejoParaLojista: config.exibirVarejo, paraCliente },
     );
+    emailEnviado = !!confirmacao?.ok;
   } catch (e) {
     console.error("[pedido] e-mail falhou (pedido mantido):", e);
   }
 
-  return { ok: true, numero: pedido.numero };
+  return { ok: true, numero: pedido.numero, email: { enviado: emailEnviado, para: paraCliente } };
 }

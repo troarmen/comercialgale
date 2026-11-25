@@ -38,6 +38,8 @@ export function lerOrdem<C extends string>(
 const DESCRICAO = {
   texto: { asc: "de A a Z", desc: "de Z a A" },
   data: { asc: "mais antigos primeiro", desc: "mais novos primeiro" },
+  /** coluna de sim/não (ex.: Lançamento): "desc" põe os marcados no topo */
+  marca: { asc: "marcados por último", desc: "marcados primeiro" },
 } as const;
 
 export function CabecalhoOrdenavel({

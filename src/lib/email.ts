@@ -57,6 +57,99 @@ function remetente() {
   return process.env.EMAIL_REMETENTE ?? `Comercial Galé <${CONTATO.email}>`;
 }
 
+/** Há SMTP configurado neste ambiente? (o painel mostra em Configurações) */
+export function smtpConfigurado() {
+  return !!process.env.SMTP_HOST;
+}
+
+/**
+ * E-mail de teste (Configurações → "Enviar e-mail de teste"): confirma, de
+ * ponta a ponta, que o servidor de e-mail aceita mensagens agora.
+ */
+export async function enviarEmailDeTeste(para: string): Promise<{ ok: true } | { erro: string }> {
+  const t = transporte();
+  if (!t) return { erro: "O envio de e-mails não está configurado neste ambiente (SMTP)." };
+  try {
+    await t.sendMail({
+      from: remetente(),
+      to: para,
+      subject: "Teste de e-mail — Comercial Galé",
+      text: `Este é um teste enviado pelo painel da Comercial Galé.
+
+Se você recebeu, os e-mails do site (confirmação de pedido, boas-vindas e links de senha) estão saindo normalmente.
+
+—
+${CONTATO.nome}`,
+    });
+    return { ok: true };
+  } catch (erro) {
+    const e = erro as { response?: string; message?: string };
+    return { erro: `O servidor de e-mail recusou: ${e?.response || e?.message || String(erro)}` };
+  }
+}
+
+// ---------------------------------------------------- registro dos envios
+
+/**
+ * Um e-mail disparado e o que aconteceu com ele. O registro vai para
+ * `log_atividades` (acao `email_enviado` / `email_falhou`) e o painel mostra
+ * na ficha do pedido e do cliente — pedido do cliente de 24/11: "confirmar se
+ * o problema foi pontual ou se existe falha no disparo". "Enviado" quer dizer
+ * que o Brevo aceitou a mensagem; se ela depois caiu no spam ou voltou, só o
+ * painel do Brevo (Transacional → Logs) sabe.
+ */
+export type Envio = { tipo: string; para: string; ok: boolean; erro?: string };
+
+export async function registrarEnvios(
+  entidade: "pedidos" | "clientes",
+  entidadeId: number,
+  envios: Envio[],
+) {
+  if (!envios.length) return;
+  try {
+    await criarClienteAdmin()
+      .from("log_atividades")
+      .insert(
+        envios.map((e) => ({
+          user_id: null,
+          acao: e.ok ? "email_enviado" : "email_falhou",
+          entidade,
+          entidade_id: String(entidadeId),
+          detalhes: { tipo: e.tipo, para: e.para, ...(e.erro ? { erro: e.erro.slice(0, 300) } : {}) },
+        })),
+      );
+  } catch (erro) {
+    console.error("[email] não foi possível registrar o envio:", erro);
+  }
+}
+
+const UM_EMAIL = /^[^@\s;,]+@[^@\s;,]+\.[a-z]{2,}$/i;
+
+/**
+ * Endereços válidos, sem repetição, na ordem das fontes. Ficha antiga pode
+ * ter dois endereços no mesmo campo ("a@x; b@y") — cada um vira um.
+ */
+export function enderecosValidos(...fontes: (string | null | undefined)[]) {
+  const vistos = new Set<string>();
+  const saida: string[] = [];
+  for (const fonte of fontes) {
+    for (const pedaco of (fonte ?? "").split(/[;,\s]+/)) {
+      const e = pedaco.trim().toLowerCase();
+      if (UM_EMAIL.test(e) && !vistos.has(e)) {
+        vistos.add(e);
+        saida.push(e);
+      }
+    }
+  }
+  return saida.slice(0, 3);
+}
+
+function motivo(r: PromiseSettledResult<unknown>) {
+  if (r.status === "fulfilled") return undefined;
+  const e = r.reason as { message?: string; response?: string } | undefined;
+  return e?.response || e?.message || String(r.reason);
+}
+
 // ------------------------------------------------------------ HTML de e-mail
 //
 // Regras de HTML de e-mail, que não são as da web: o Outlook do Windows
@@ -300,12 +393,12 @@ type Tabela = "atacado" | "varejo";
 const TABELA: Record<Tabela, { titulo: string; apoio: string; rodape: string }> = {
   atacado: {
     titulo: "Valores de Atacado",
-    apoio: "o preço de lojista",
+    apoio: "compras a partir do pedido mínimo",
     rodape: "Valor Pedido Atacado",
   },
   varejo: {
     titulo: "Valores de Varejo",
-    apoio: "preço de revenda ao consumidor",
+    apoio: "compras abaixo do pedido mínimo",
     rodape: "Valor Pedido Varejo",
   },
 };
@@ -452,22 +545,43 @@ ${RODAPE_TEXTO}`;
 export async function enviarEmailsDePedido(
   pedido: PedidoParaEmail,
   emailsDaCasa: string[],
-  { varejoParaLojista }: { varejoParaLojista: boolean },
-) {
+  {
+    varejoParaLojista,
+    paraCliente,
+  }: {
+    varejoParaLojista: boolean;
+    /**
+     * Para onde vai a confirmação do lojista: o e-mail do LOGIN primeiro (é o
+     * que ele usa e que já recebeu o link de senha) e os da ficha depois. Antes
+     * ia só o da ficha — e ficha migrada do sistema antigo pode ter endereço
+     * velho ou dois endereços num campo só.
+     */
+    paraCliente: string[];
+  },
+): Promise<{ cliente: Envio | null; envios: Envio[] }> {
   const t = transporte();
   if (!t) {
     console.warn(
       `[email] SMTP não configurado — pedido ${pedido.numero} gravado sem e-mail de confirmação.`,
     );
-    return { enviado: false };
+    const envio: Envio = {
+      tipo: "confirmação do pedido",
+      para: paraCliente.join(", ") || "—",
+      ok: false,
+      erro: "SMTP não configurado neste ambiente",
+    };
+    await registrarEnvios("pedidos", pedido.id, [envio]);
+    return { cliente: envio, envios: [envio] };
   }
 
+  const tipos: { tipo: string; para: string }[] = [];
   const envios: Promise<unknown>[] = [];
-  if (pedido.cliente.email) {
+  if (paraCliente.length) {
+    tipos.push({ tipo: "confirmação do pedido", para: paraCliente.join(", ") });
     envios.push(
       t.sendMail({
         from: remetente(),
-        to: pedido.cliente.email,
+        to: paraCliente,
         subject: `Pedido ${pedido.numero} recebido — Comercial Galé`,
         text: textoPedido(pedido, true, varejoParaLojista),
         html: htmlPedido(pedido, true, varejoParaLojista),
@@ -475,6 +589,7 @@ export async function enviarEmailsDePedido(
     );
   }
   for (const email of emailsDaCasa) {
+    tipos.push({ tipo: "aviso para a casa", para: email });
     envios.push(
       t.sendMail({
         from: remetente(),
@@ -489,11 +604,19 @@ export async function enviarEmailsDePedido(
   }
 
   const resultados = await Promise.allSettled(envios);
-  const falhas = resultados.filter((r) => r.status === "rejected");
-  for (const f of falhas) {
-    console.error(`[email] falha no envio do pedido ${pedido.numero}:`, f);
+  const registro: Envio[] = resultados.map((r, i) => ({
+    ...tipos[i],
+    ok: r.status === "fulfilled",
+    erro: motivo(r),
+  }));
+  for (const e of registro) {
+    if (!e.ok) console.error(`[email] falha no envio do pedido ${pedido.numero} (${e.tipo}):`, e.erro);
   }
-  return { enviado: falhas.length < resultados.length };
+  await registrarEnvios("pedidos", pedido.id, registro);
+  return {
+    cliente: paraCliente.length ? registro[0] : null,
+    envios: registro,
+  };
 }
 
 // ------------------------------------------------------------- link de senha
@@ -503,7 +626,12 @@ export async function enviarEmailsDePedido(
  * automática DESLIGADA — o login existe, mas o preço espera a equipe. Não dá
  * para mandar o "acesso_liberado" ("seu cadastro foi aprovado") nesse caso.
  */
-export type MotivoLinkSenha = "redefinir" | "acesso_liberado" | "acesso_criado" | "convite_equipe";
+export type MotivoLinkSenha =
+  | "redefinir"
+  | "acesso_liberado"
+  | "acesso_criado"
+  | "convite_equipe"
+  | "site_novo";
 
 const TEXTO_LINK: Record<MotivoLinkSenha, { assunto: string; abertura: string }> = {
   redefinir: {
@@ -520,6 +648,13 @@ const TEXTO_LINK: Record<MotivoLinkSenha, { assunto: string; abertura: string }>
     assunto: "Seu login na Comercial Galé foi criado",
     abertura:
       "Encontramos o cadastro da sua loja e criamos o seu login. Os preços de atacado aparecem assim que a nossa equipe liberar a loja — avisamos por e-mail. Para começar, crie a sua senha pelo link abaixo.",
+  },
+  // Convite em lote para quem veio do site antigo e ainda não criou a senha
+  // (Clientes → Criar senha; relatório do cliente de 24/11).
+  site_novo: {
+    assunto: "Crie a sua senha no site novo da Comercial Galé",
+    abertura:
+      "A Comercial Galé está de site novo e o cadastro da sua loja veio junto. Para ver os preços e fazer pedidos, crie a sua senha pelo link abaixo — o seu login é este e-mail.",
   },
   convite_equipe: {
     assunto: "Seu acesso ao painel da Comercial Galé",
@@ -628,8 +763,8 @@ export type ContextoCadastro = {
 function comoFunciona(ctx: ContextoCadastro) {
   const site = urlDosLinks();
   const precos = ctx.exibirVarejo
-    ? "cada produto mostra o preço de <strong>Atacado</strong> (o seu preço de lojista) e o de <strong>Varejo</strong> (preço de revenda ao consumidor)."
-    : "cada produto mostra o preço de <strong>Atacado</strong>, o seu preço de lojista.";
+    ? "cada produto mostra o preço de <strong>Atacado</strong> (para compras a partir do pedido mínimo) e o de <strong>Varejo</strong> (para compras abaixo dele ou para quem prefere comprar no Varejo)."
+    : "cada produto mostra o preço de <strong>Atacado</strong>.";
   return [
     ctx.liberado
       ? { titulo: "Os preços já estão liberados", texto: `Com o login, ${precos}` }
@@ -847,6 +982,9 @@ export async function enviarEmailsDeCadastro(
   const t = transporte();
   if (!t) {
     console.warn(`[email] SMTP não configurado — cadastro ${cadastro.id} gravado sem e-mail.`);
+    await registrarEnvios("clientes", cadastro.id, [
+      { tipo: "boas-vindas", para: cadastro.email, ok: false, erro: "SMTP não configurado neste ambiente" },
+    ]);
     return;
   }
 
@@ -862,6 +1000,9 @@ export async function enviarEmailsDeCadastro(
     avisarCasaDoCadastro(cadastro, ctx),
   ]);
   if (boas.status === "rejected") console.error(`[email] falha nas boas-vindas do cadastro ${cadastro.id}:`, boas.reason);
+  await registrarEnvios("clientes", cadastro.id, [
+    { tipo: "boas-vindas", para: cadastro.email, ok: boas.status === "fulfilled", erro: motivo(boas) },
+  ]);
 }
 
 /**

@@ -131,7 +131,7 @@ export function FormularioConfiguracoes({
 
       <Secao
         titulo="Preço de Varejo"
-        descricao="Mostra ao lojista, ao lado do preço de Atacado, o preço de revenda ao consumidor. Desligar esconde o Varejo do catálogo e do e-mail de confirmação do lojista — a cópia da casa e os pedidos antigos continuam guardando o valor."
+        descricao="Mostra ao lojista, ao lado do preço de Atacado, o preço de Varejo (o das compras abaixo do pedido mínimo). Desligar esconde o Varejo do catálogo e do e-mail de confirmação do lojista — a cópia da casa e os pedidos antigos continuam guardando o valor."
       >
         <Interruptor
           nome="exibir_preco_varejo"

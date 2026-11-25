@@ -386,16 +386,12 @@ export async function excluirProduto(id: number): Promise<EstadoProduto> {
   if (!sessao) return { erro: SEM_PERMISSAO };
   const { supabase, user } = sessao;
 
-  const { count } = await supabase
-    .from("pedido_itens")
-    .select("id", { count: "exact", head: true })
-    .eq("produto_id", id);
-
-  if (count) {
-    return {
-      erro: `Este produto aparece em ${count} ${count === 1 ? "pedido" : "pedidos"}. Desative em vez de excluir, para não perder o histórico.`,
-    };
-  }
+  // Produto que já foi pedido também pode ser excluído (relatório do cliente
+  // de 24/11: o produto descontinuado ficava sem opção). O histórico não se
+  // perde: cada item de pedido guarda cópia de título, referência, tamanho e
+  // preços, e o vínculo com o produto vira NULL sozinho (`on delete set null`
+  // em pedido_itens) — o pedido passa a mostrar o item como "fora do
+  // catálogo", sem link para a ficha.
 
   const { data: fotos } = await supabase
     .from("produto_imagens")

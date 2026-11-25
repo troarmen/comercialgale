@@ -67,10 +67,25 @@ export function PaginaCarrinhoCliente() {
         <h2 className="mt-4 text-2xl font-bold tracking-tight text-texto">
           Pedido {resultado.numero} recebido!
         </h2>
+        {/* Só promete e-mail quando ele saiu (relatório do cliente de 24/11:
+            a tela dizia "enviamos" e o e-mail não chegava). */}
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-suave">
-          Enviamos a confirmação para o seu e-mail. Nossa equipe entra em
-          contato para combinar o pagamento e o envio — nada é cobrado pelo
-          site.
+          {resultado.email.enviado ? (
+            <>
+              Enviamos a confirmação para{" "}
+              <strong className="font-semibold text-texto">
+                {resultado.email.para.join(" e ")}
+              </strong>
+              . Se não chegar em alguns minutos, confira o spam.
+            </>
+          ) : (
+            <>
+              Não conseguimos enviar o e-mail de confirmação agora, mas o
+              pedido está com a nossa equipe — guarde o número acima.
+            </>
+          )}{" "}
+          Nossa equipe entra em contato para combinar o pagamento e o envio —
+          nada é cobrado pelo site.
         </p>
         <Link
           href="/produtos"
@@ -354,8 +369,9 @@ export function PaginaCarrinhoCliente() {
             {abaixoDoMinimo && (
               <p className="mt-3 rounded-lg bg-alerta-fundo px-3 py-2 text-xs font-medium leading-relaxed text-alerta-texto">
                 Compras no atacado são a partir de {reais(pedidoMinimo)} — o seu
-                pedido está em {reais(totalAtacado)}. Dá para fechar mesmo
-                assim: nossa equipe confirma as condições com você.
+                pedido está em {reais(totalAtacado)}. Abaixo desse valor vale o
+                preço de Varejo. Dá para fechar mesmo assim: nossa equipe
+                confirma as condições com você.
               </p>
             )}
 

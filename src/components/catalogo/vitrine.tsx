@@ -40,9 +40,13 @@ export async function Vitrine({
   // Só oferece as marcas que existem no recorte atual? A contagem por recorte
   // custaria outra consulta; a lista completa já ajuda e nunca mente — filtro
   // sem resultado cai no estado vazio com saída clara.
+  // No filtro, de A a Z (relatório do cliente de 24/11) — a lista vem
+  // ordenada por quantidade de produtos, que é o que a home e /marcas usam.
   const opcoesMarca = semFiltroDeMarca
     ? []
-    : marcas.map((m) => ({ id: m.id, nome: m.nome }));
+    : marcas
+        .map((m) => ({ id: m.id, nome: m.nome }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
 
   return (
     <>

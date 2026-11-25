@@ -41,7 +41,7 @@ export function BuscaPedidos() {
       <input
         value={termo}
         onChange={(e) => setTermo(e.target.value)}
-        placeholder="Buscar pelo número do pedido…"
+        placeholder="Buscar por número ou cliente…"
         aria-label="Buscar pedidos"
         className="h-9 w-full rounded-lg border border-borda bg-superficie pl-8 pr-3 text-sm text-texto outline-none transition placeholder:text-tenue focus:border-gale-500"
       />

@@ -230,8 +230,9 @@ export function ComprarProduto({
       </div>
 
       <p className="mt-3 text-xs leading-relaxed text-suave">
-        Preços por embalagem fechada ({rotuloEmbalagem}). Atacado é o seu
-        preço de lojista; Varejo é o preço de revenda ao consumidor.
+        Preços por embalagem fechada ({rotuloEmbalagem}). Atacado vale para
+        compras a partir do pedido mínimo; Varejo, para compras abaixo dele ou
+        para quem prefere comprar no Varejo.
       </p>
 
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-borda pt-4">

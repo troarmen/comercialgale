@@ -145,6 +145,15 @@ export default async function PaginaClientes({
             {numero(total)} {total === 1 ? "cliente" : "clientes"}
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Convite em lote para quem veio do site antigo e ainda não
+              criou a senha (relatório do cliente de 24/11). */}
+          <Link
+            href="/admin/clientes/senhas"
+            className="flex h-9 items-center rounded-lg border border-borda bg-superficie px-3.5 text-sm font-medium text-texto transition hover:bg-superficie-2"
+          >
+            Ainda sem senha
+          </Link>
         <Link
           href="/admin/clientes/novo"
           className="flex h-9 items-center gap-1.5 rounded-lg bg-acento px-3.5 text-sm font-semibold text-white transition hover:bg-acento-forte"
@@ -154,6 +163,7 @@ export default async function PaginaClientes({
           </svg>
           Novo cliente
         </Link>
+        </div>
       </header>
 
       {!!semLogin && !sp.acesso && (
