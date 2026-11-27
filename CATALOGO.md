@@ -376,7 +376,7 @@ Relatório "Alterações 24.11" (Arthur). O que ficou em cada item:
 | # | Pedido | O que foi feito |
 |---|---|---|
 | 1.1 | Datas de cadastro do site antigo | Migração 010 — o Tro rodou em produção em 24/11 (commit `1cccfca`). |
-| 1.2 | Marcação "Lançamento" do antigo | Migração **011** (pendente, roda no SQL Editor): liga os 180 lançamentos do site antigo pela foto de 23/08 — o servidor antigo não responde mais. Só liga, nunca desliga. |
+| 1.2 | Marcação "Lançamento" do antigo | Migração **011** (aplicada em 27/11: 185 marcados, 204 no total): liga os 185 lançamentos do site antigo, lidos em 27/11 (o servidor antigo ainda responde pelo IP 191.6.218.131 com `Host: www.comercialgale.com.br`). Só liga, nunca desliga. |
 | 1.3 | Organizar por lançamento no painel | Produtos: coluna "Lançamento" ordenável (marcados primeiro, os mais novos no topo) e atalho **Lançamentos (N)** no cabeçalho; desmarcar pela caixa da linha ou em lote (já existiam). |
 | 2.1 | Ordem "aleatória" nas categorias | Padrão da vitrine: lançamentos → marca → nome → referência, e `id` como desempate em toda ordem (sem ele, empates trocavam de lugar e de página). |
 | 2.2 | Marcas fora de ordem no filtro | Filtro da vitrine em A–Z (`localeCompare` pt-BR); as listas dos filtros do painel também. A home e /marcas seguem por quantidade de produtos. |

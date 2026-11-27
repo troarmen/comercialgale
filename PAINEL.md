@@ -305,7 +305,7 @@ Onde o catálogo encosta no painel, e pode precisar que ele seja complementado:
 | 008 | `mudar_status_pedido()`: colaborador muda SÓ a situação do pedido, com log |
 | 009 | `link_senha_liberado()`: trava de 60 s por e-mail para o link de senha |
 | 010 | Aplicada em produção em 24/11/2026 pelo Tro (2017=172 … 2026=64): data real de cadastro dos produtos do legado em `created_at` (com backup e reversão no cabeçalho) + `clientes.cadastrado_em` com default e sem nulos |
-| 011 | **PENDENTE em produção (nov/2026)**: liga `lancamento` nos 180 produtos que o site antigo marcava em 23/08 (por `legado_id`; nunca desliga nada; backup e reversão no cabeçalho). O código funciona com ou sem ela |
+| 011 | Aplicada em produção em 27/11/2026 pelo Tro (185 marcados; 204 lançamentos no total com os 19 já marcados à mão): liga `lancamento` nos 185 produtos que o site antigo marca (lidos em 27/11 pelo IP; por `legado_id`; nunca desliga nada; backup em `_backup_011_lancamento` e reversão no cabeçalho) |
 
 Não há CLI de migração: o SQL é rodado à mão no SQL Editor do Supabase.
 Escreva migração nova como arquivo numerado, dentro de `begin; ... commit;`.
