@@ -58,8 +58,8 @@ export default async function PaginaSenhasPendentes() {
           <p className="mt-1 text-xs text-tenue">
             Vai em lotes de {TAMANHO_LOTE}: o serviço de e-mail tem cota diária
             (cerca de 300 por dia, somando pedidos e cadastros). Quem recebeu
-            convite nos últimos 7 dias espera o lote seguinte. O link vale 1
-            hora; depois disso a pessoa usa &quot;Esqueci minha senha&quot; no
+            convite nos últimos 7 dias espera o lote seguinte. O link vale 24
+            horas; depois disso a pessoa usa &quot;Esqueci minha senha&quot; no
             site com o mesmo e-mail.
           </p>
         </div>
