@@ -665,7 +665,7 @@ const TEXTO_LINK: Record<MotivoLinkSenha, { assunto: string; abertura: string }>
 
 /**
  * Link de uso único para a pessoa criar ou trocar a senha. O link vem de
- * `gerarLinkSenha` (src/lib/links-senha.ts) e vale 1 hora.
+ * `gerarLinkSenha` (src/lib/links-senha.ts) e vale 24 horas (Email OTP Expiration = 86400 no Supabase Auth).
  *
  * Devolve false se não houver SMTP ou o envio falhar — quem chama decide o
  * que dizer na tela.
@@ -689,7 +689,7 @@ ${abertura}
 
 ${link}
 
-O link vale por 1 hora e funciona uma vez só. Se expirar, peça outro em ${urlDosLinks()}/esqueci-senha.
+O link vale por 24 horas e funciona uma vez só. Se expirar, peça outro em ${urlDosLinks()}/esqueci-senha.
 ${motivo === "redefinir" ? "\nNão pediu? Pode ignorar este e-mail — a sua senha continua a mesma.\n" : ""}
 —
 ${CONTATO.nome} · WhatsApp ${CONTATO.whatsapp} · ${CONTATO.email}`;

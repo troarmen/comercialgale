@@ -6,7 +6,7 @@ import { useState } from "react";
  * Resultado de "criar login" / "reenviar link" no painel.
  *
  * E-mail saiu: só confirma. Não saiu: mostra o link para o Arthur copiar e
- * mandar por WhatsApp — o link vale 1 hora e funciona uma vez.
+ * mandar por WhatsApp — o link vale 24 horas e funciona uma vez.
  */
 export function ResultadoConvite({
   titulo,
@@ -29,7 +29,7 @@ export function ResultadoConvite({
         <p className="text-sm font-semibold text-ok-texto">{titulo}</p>
         <p className="mt-1 text-sm text-ok-texto">
           Enviamos para <strong className="break-all font-semibold">{email}</strong> o
-          link para criar a senha. O link vale por 1 hora; se expirar, a pessoa usa
+          link para criar a senha. O link vale por 24 horas; se expirar, a pessoa usa
           &quot;Esqueci minha senha&quot; no login.
         </p>
         {aoFechar && (

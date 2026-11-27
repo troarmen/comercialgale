@@ -208,7 +208,7 @@ Para quem mexe no painel, o que importa:
   `@supabase/ssr` ele usa PKCE, e o link só funciona no navegador de quem
   pediu — o do Arthur.
 - **Ninguém recebe senha provisória.** O login nasce sem senha; a pessoa cria
-  a dela pelo link (vale 1 h, uso único). Se o e-mail falhar, o painel mostra
+  a dela pelo link (vale 24 h — Email OTP Expiration = 86400 no Supabase desde 27/11 —, uso único). Se o e-mail falhar, o painel mostra
   o link para o Arthur copiar e mandar por WhatsApp.
 - `emails_notificacao` recebe o aviso de **pedido novo** e de **cadastro novo
   para aprovar**.

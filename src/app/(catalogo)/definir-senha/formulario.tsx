@@ -20,7 +20,7 @@ export function FormularioSenha({ token }: { token: string | null }) {
           Este link expirou ou já foi usado.
         </p>
         <p className="mt-1 text-sm text-suave">
-          Os links valem por 1 hora e funcionam uma vez só.
+          Os links valem por 24 horas e funcionam uma vez só.
         </p>
         <Link
           href="/esqueci-senha"
